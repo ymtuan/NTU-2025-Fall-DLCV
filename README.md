@@ -26,5 +26,5 @@ If your model checkpoints are larger than GitHub’s maximum capacity (50 MB), y
 # Q&A
 If you have any problems related to HW1, you may
 - Use TA hours
-- Contact TAs by e-mail ([ntudlcv@gmail.com](mailto:ntudlcv@gmail.com))
+- Contact TAs by e-mail ([ntu-dlcv-2025-fall-ta@googlegroups.com](mailto:ntu-dlcv-2025-fall-ta@googlegroups.com))
 - Post your question to NTU COOL under HW1 Discussions
