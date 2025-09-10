@@ -1,3 +1,3 @@
 #!/bin/bash
 
-gdown https://drive.google.com/uc?id=1jnTkrIbihkF7SXaPT188QGqySu0se2EY
+gdown https://drive.google.com/uc?id=1yt4CP2msqY2HSYCy67mQrWUtTPQRgcBF
