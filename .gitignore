@@ -4,3 +4,10 @@
 hw1_data/*
 *png
 *jpg
+
+*zip
+
+wandb/
+*.pth
+__pycache__/
+*.pyc
