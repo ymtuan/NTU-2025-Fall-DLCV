@@ -90,7 +90,7 @@ class BasicDataset(Dataset):
 
         if is_mask:
             mask = np.zeros((newH, newW), dtype=np.int64)
-            
+            '''
             for i, v in enumerate(mask_values):
                 if img.ndim == 2:
                     mask[img == v] = i
@@ -102,7 +102,7 @@ class BasicDataset(Dataset):
                     mask[(img == rgb).all(axis=-1)] = idx
             else:
                 mask = img.astype(np.int64)
-            '''
+            
             return mask
             
 

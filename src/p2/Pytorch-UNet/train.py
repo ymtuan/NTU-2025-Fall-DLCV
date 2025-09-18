@@ -30,7 +30,7 @@ dir_checkpoint = Path('./checkpoints/')
 def train_model(
         model,
         device,
-        epochs: int = 100,
+        epochs: int = 200,
         batch_size: int = 32,
         learning_rate: float = 1e-4,
         val_percent: float = 0.1,
@@ -50,7 +50,7 @@ def train_model(
     train_set, val_set = random_split(dataset, [n_train, n_val], generator=torch.Generator().manual_seed(0))
 
     # 3. Create data loaders
-    loader_args = dict(batch_size=batch_size, num_workers=os.cpu_count(), pin_memory=True)
+    loader_args = dict(batch_size=batch_size, num_workers=0, pin_memory=True)
     train_loader = DataLoader(train_set, shuffle=True, **loader_args)
     val_loader = DataLoader(val_set, shuffle=False, drop_last=True, **loader_args)
 
@@ -100,10 +100,10 @@ def train_model(
                 with torch.autocast(device.type if device.type != 'mps' else 'cpu', enabled=amp):
                     masks_pred = model(images)
 
-                    print("masks_pred shape:", masks_pred.shape)
-                    print("masks_pred dtype:", masks_pred.dtype)
-                    print("masks_pred min/max:", masks_pred.min().item(), masks_pred.max().item())
-                    print("unique values:", torch.unique(masks_pred))
+                    #print("masks_pred shape:", masks_pred.shape)
+                    #print("masks_pred dtype:", masks_pred.dtype)
+                    #print("masks_pred min/max:", masks_pred.min().item(), masks_pred.max().item())
+                    #print("unique values:", torch.unique(masks_pred))
                     #break  # just check first batch
 
                     if model.n_classes == 1:
@@ -157,11 +157,16 @@ def train_model(
                                 images = images.to(device)
                                 true_masks = true_masks.to(device)
 
+                                #print(true_masks)
+
                                 outputs = model(images)
                                 preds = torch.argmax(outputs, dim=1)
 
+                                #print(preds)
+
                                 all_preds.append(preds.cpu().numpy())
                                 all_labels.append(true_masks.cpu().numpy())
+
                         
                         all_preds = np.concatenate(all_preds, axis=0)
                         all_labels = np.concatenate(all_labels, axis=0)
@@ -198,12 +203,12 @@ def train_model(
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks')
     parser.add_argument('--epochs', '-e', metavar='E', type=int, default=100, help='Number of epochs')
-    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=32, help='Batch size')
-    parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-5,
+    parser.add_argument('--batch-size', '-b', dest='batch_size', metavar='B', type=int, default=16, help='Batch size')
+    parser.add_argument('--learning-rate', '-l', metavar='LR', type=float, default=1e-3,
                         help='Learning rate', dest='lr')
     parser.add_argument('--load', '-f', type=str, default=False, help='Load model from a .pth file')
-    parser.add_argument('--scale', '-s', type=float, default=0.5, help='Downscaling factor of the images')
-    parser.add_argument('--validation', '-v', dest='val', type=float, default=10.0,
+    parser.add_argument('--scale', '-s', type=float, default=1.0, help='Downscaling factor of the images')
+    parser.add_argument('--validation', '-v', dest='val', type=float, default=20.0,
                         help='Percent of the data that is used as validation (0-100)')
     parser.add_argument('--amp', action='store_true', default=False, help='Use mixed precision')
     parser.add_argument('--bilinear', action='store_true', default=False, help='Use bilinear upsampling')
@@ -216,13 +221,14 @@ if __name__ == '__main__':
     args = get_args()
 
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device('cpu')
     logging.info(f'Using device {device}')
 
-    # Change here to adapt to your data
+    # Change here to adapt to ydateour data
     # n_channels=3 for RGB images
     # n_classes is the number of probabilities you want to get per pixel
-    model = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
+    model = UNet(n_channels=3, n_classes=7, bilinear=args.bilinear)
     model = model.to(memory_format=torch.channels_last)
 
     logging.info(f'Network:\n'
@@ -237,9 +243,19 @@ if __name__ == '__main__':
         model.load_state_dict(state_dict)
         logging.info(f'Model loaded from {args.load}')
     '''
-    model = torch.hub.load('milesial/Pytorch-UNet', 'unet_carvana', pretrained=True)
+    pretrained_model = torch.hub.load('milesial/Pytorch-UNet', 'unet_carvana', pretrained=True, scale=1.0)
+    pretrained_dict = pretrained_model.state_dict()
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict and not k.startswith("outc.")}
+    model_dict.update(pretrained_dict)
+    model.load_state_dict(model_dict)
 
+    torch.nn.init.xavier_normal_(model.outc.conv.weight)
+    if model.outc.conv.bias is not None:
+        torch.nn.init.zeros_(model.outc.conv.bias)
+    
     model.to(device=device)
+
     try:
         train_model(
             model=model,
