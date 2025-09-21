@@ -1,0 +1,16 @@
+local2globe
+
+epochs: 6
+lr: 1e-4
+
+--batch_size 16 \
+--sub_batch_size 16 \
+--size_g 508 \
+--size_p 508 \
+
+global
+epochs: 120
+lr = 5e-5
+batch_size = 16
+size_p = 512
+size_g = 512

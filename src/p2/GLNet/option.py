@@ -39,13 +39,32 @@ class Options():
         args = self.parser.parse_args()
         # default settings for epochs and lr
         if args.mode == 1 or args.mode == 3:
+            # repo default
             # args.num_epochs = 120
             # args.lr = 5e-5
-            args.num_epochs = 6
-            args.lr = 1e-4
-        else:
-            # args.num_epochs = 50
-            args.num_epochs = 15
+
+            # for l2g first 6 epochs
+            # args.num_epochs = 6
+            # args.lr = 1e-4
+
+            # for l2g epoch 7-30
+            # args.num_epochs = 30
             # args.lr = 2e-5
-            args.lr = 5e-5
+
+            # for global epoch 121-160
+            args.num_epochs = 200
+            args.lr = 2e-5
+        else:
+            # repo default
+            # args.num_epochs = 50
+            # args.lr = 2e-5
+            
+            # epoch 0-15
+            # args.num_epochs = 15
+            # args.lr = 5e-5
+
+            # for epoch 15-50
+            args.num_epochs = 50
+            args.lr = 2e-5
+            
         return args

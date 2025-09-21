@@ -14,9 +14,10 @@ size_p = 508
 
 data_path = "../../../data_2025/p2_data/"
 model_path = "./saved_models/"
-path_g = "fpn_deepglobe_global.pth"
-path_g2l = "fpn_deepglobe_global2local.pth"
-path_l2g = "fpn_deepglobe_local2global.pth"
+path_g = "fpn_deepglobe_global.epoch129.pth"
+path_g2l = "fpn_deepglobe_global2local.epoch28.pth"
+path_l2g = "fpn_deepglobe_local2global.epoch28.pth"
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Using device:", device)

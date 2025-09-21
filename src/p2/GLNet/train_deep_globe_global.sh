@@ -6,7 +6,8 @@ python train_deep_globe.py \
 --log_path "./runs/" \
 --task_name "fpn_deepglobe_global" \
 --mode 1 \
---batch_size 16 \
---sub_batch_size 16 \
---size_g 512 \
---size_p 512
+--batch_size 32 \
+--sub_batch_size 32 \
+--size_g 508 \
+--size_p 508 \
+--path_g "fpn_deepglobe_global_epoch120.pth"

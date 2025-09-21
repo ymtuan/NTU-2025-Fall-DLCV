@@ -1,6 +1,6 @@
 import torch
 import cv2
-from segment_anything import sam_model_registry, SamPredictor
+from segment_anything import sam_model_registry, SamAutomaticMaskGenerator
 import imageio
 import numpy as np
 
@@ -11,8 +11,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 sam = sam_model_registry[model_type](checkpoint=sam_checkpopint)
 sam.to(device)
-
-predictor = SamPredictor(sam)
+mask_generator = SamAutomaticMaskGenerator(sam)
 
 # validation images
 image_paths = [
@@ -23,12 +22,15 @@ image_paths = [
 
 for image_path in image_paths:
     image = cv2.imread(image_path)
+    
+    if image is None:
+        print(f"Failed to read {image_path}, skipping...")
+        continue
+
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
-    predictor.set_image(image_rgb)
+    masks = mask_generator.generate(image_rgb)
 
-    masks, scores, logits = predictor.predict(multimask_output=True)
-
-    mask_to_save = (masks[0] * 255).astype(np.uint8)
-    save_path = image_path.replace(".jpg", "_mask.png")
+    mask_to_save = (masks[0]['segmentation'][:, :, np.newaxis] * 255).repeat(3, axis=2).astype(np.uint8)
+    save_path = image_path.replace("_sat.jpg", "_sam.png")
     imageio.imsave(save_path, mask_to_save)

@@ -182,6 +182,12 @@ def create_model_load_weights(n_class, mode=1, evaluation=False, path_g=None, pa
         # 3. load the new state dict
         model.load_state_dict(state)
 
+        # Resume training from saved checkpoint
+        if path_g2l is not None:
+            print("Loading checkpoint for resuming global2local training:", path_g2l)
+            checkpoint = torch.load(path_g2l)
+            model.load_state_dict(checkpoint)
+
     if (mode == 3 and not evaluation) or (mode == 2 and evaluation):
         partial = torch.load(path_g2l)
         state = model.state_dict()
@@ -192,7 +198,20 @@ def create_model_load_weights(n_class, mode=1, evaluation=False, path_g=None, pa
         # 3. load the new state dict
         model.load_state_dict(state)
 
+        # Resume training from saved checkpoint
+        if path_l2g is not None:
+            print("Loading checkpoint for resuming local2global training:", path_l2g)
+            checkpoint = torch.load(path_l2g)
+            model.load_state_dict(checkpoint)
+
     global_fixed = None
+
+    if mode == 1 and not evaluation:
+        # Resume trianing for global from saved checkpoint
+        print("Loading checkpoint for resuming global training: ", path_g)
+        checkpoint = torch.load(path_g)
+        model.load_state_dict(checkpoint)
+
     if mode == 3:
         # load fixed basic global branch
         global_fixed = fpn(n_class)

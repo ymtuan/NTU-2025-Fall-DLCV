@@ -84,7 +84,8 @@ criterion2 = nn.CrossEntropyLoss()
 criterion3 = lovasz_softmax
 # criterion = lambda x,y: criterion1(x, y)
 # criterion = criterion2
-criterion = lambda x,y: 0.5*criterion1(x, y) + 0.5*criterion3(x, y)
+# criterion = lambda x,y: 0.5*criterion1(x, y) + 0.5*criterion3(x, y)
+criterion = lambda x,y: 0.25*criterion1(x, y) + 0.75*criterion3(x, y)
 mse = nn.MSELoss()
 
 if not evaluation:
@@ -96,7 +97,10 @@ evaluator = Evaluator(n_class, size_g, size_p, sub_batch_size, mode, test)
 
 best_pred = 0.0
 print("start training......")
-for epoch in range(num_epochs):
+
+start_epoch = 121
+
+for epoch in range(start_epoch, num_epochs):
     trainer.set_train(model)
     optimizer.zero_grad()
     tbar = tqdm(dataloader_train); train_loss = 0
@@ -152,8 +156,8 @@ for epoch in range(num_epochs):
 
             # torch.cuda.empty_cache()
 
-            # if not (test or evaluation): torch.save(model.state_dict(), "./saved_models/" + task_name + ".epoch" + str(epoch) + ".pth")
-            if not (test or evaluation): torch.save(model.state_dict(), "./saved_models/" + task_name + ".pth")
+            if not (test or evaluation): torch.save(model.state_dict(), "./saved_models/" + task_name + ".epoch" + str(epoch) + ".pth")
+            # if not (test or evaluation): torch.save(model.state_dict(), "./saved_models/" + task_name + ".pth")
 
             if test: break
             else:

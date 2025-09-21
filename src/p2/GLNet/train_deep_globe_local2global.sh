@@ -11,4 +11,5 @@ python train_deep_globe.py \
 --size_g 508 \
 --size_p 508 \
 --path_g "fpn_deepglobe_global.pth" \
---path_g2l "fpn_deepglobe_global2local.pth"
+--path_g2l "fpn_deepglobe_global2local.pth" \
+--path_l2g "fpn_deepglobe_local2global_epoch6.pth"
