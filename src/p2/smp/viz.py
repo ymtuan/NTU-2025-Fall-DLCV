@@ -1,8 +1,8 @@
 import re
 import matplotlib.pyplot as plt
 
-log_file = "output.log"          # path to your log file
-save_path = "loss_miou.png"  # path to save figure
+log_file = "output_focal.log"          # path to your log file
+save_path = "focal_loss_miou.png"  # path to save figure
 
 # Lists to store metrics
 train_losses = []

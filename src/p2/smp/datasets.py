@@ -1,7 +1,7 @@
-import os
-import cv2
+import glob
 import numpy as np
 from torch.utils.data import Dataset
+from PIL import Image
 
 COLOR2CLASS = {
     (0, 255, 255): 0,   # Cyan Urban
@@ -33,37 +33,35 @@ def mask_to_rgb(mask):
 
 class DeepGlobeDataset(Dataset):
     def __init__(self, images_dir, augmentation=None, preprocessing=None):
-        self.images_dir = images_dir
         # collect all *_sat.jpg files
-        self.ids = [f.replace("_sat.jpg", "") for f in os.listdir(images_dir) if f.endswith("_sat.jpg")]
+        sat_files = glob.glob(f"{images_dir}/*_sat.jpg")
+        self.ids = [f.split("/")[-1].replace("_sat.jpg", "") for f in sat_files]
         self.ids.sort()
+
+        self.images_dir = images_dir
         self.augmentation = augmentation
         self.preprocessing = preprocessing
 
     def __getitem__(self, idx):
         sample_id = self.ids[idx]
-        img_path = os.path.join(self.images_dir, f"{sample_id}_sat.jpg")
-        mask_path = os.path.join(self.images_dir, f"{sample_id}_mask.png")
+        img_path = f"{self.images_dir}/{sample_id}_sat.jpg"
+        mask_path = f"{self.images_dir}/{sample_id}_mask.png"
 
-        image = cv2.imread(img_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # use PIL instead of cv2
+        image = np.array(Image.open(img_path).convert("RGB"), dtype=np.uint8)
+        mask_rgb = np.array(Image.open(mask_path).convert("RGB"), dtype=np.uint8)
 
-        mask_rgb = cv2.imread(mask_path)
-        mask_rgb = cv2.cvtColor(mask_rgb, cv2.COLOR_BGR2RGB)
         mask = rgb_to_mask(mask_rgb)
 
         if self.augmentation:
-            sample = self.augmentation(image=image, mask=mask)
-            image, mask = sample["image"], sample["mask"]
+            image, mask = self.augmentation(image, mask)
 
         if self.preprocessing:
-            sample = self.preprocessing(image=image, mask=mask)
-            image, mask = sample["image"], sample["mask"]
+            image, mask = self.preprocessing(image, mask)
 
-        mask = mask.long()  # <-- important
+        mask = mask.long()  # final cast to long tensor
 
         return image, mask
-
 
     def __len__(self):
         return len(self.ids)

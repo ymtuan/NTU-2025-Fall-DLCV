@@ -1,71 +1,70 @@
-import os
-import cv2
+import glob
 import torch
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
+import numpy as np
+from PIL import Image
 import segmentation_models_pytorch as smp
 
 from datasets import mask_to_rgb
+from transforms import get_preprocessing
 from utils import load_model
 
 # -----------------------------
 # Config
 # -----------------------------
-DATA_DIR = "../../../data_2025/p2_data/validation/"
-OUT_DIR = "prediction"
-os.makedirs(OUT_DIR, exist_ok=True)
+DATA_DIR = "../../../data_2025/p2_data/validation"
+OUTPUT_DIR = "./prediction"
+MODEL_PATH = "best_deeplabv3plus_epoch173.pth"
 
 ENCODER = "resnet50"
+ENCODER_WEIGHTS = "imagenet"
 NUM_CLASSES = 7
+ACTIVATION = None
 
 # -----------------------------
-# Build model
+# Model + Preprocessing
 # -----------------------------
+preprocess_input = smp.encoders.get_preprocessing_fn(
+    ENCODER, pretrained=ENCODER_WEIGHTS
+)
+
 model = smp.DeepLabV3Plus(
     encoder_name=ENCODER,
     encoder_weights=None,
     in_channels=3,
-    classes=NUM_CLASSES
+    classes=NUM_CLASSES,
+    activation=ACTIVATION,
 )
+
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-model = load_model(model, "best_deeplabv3plus_epoch108.pth", DEVICE)
+load_model(model, MODEL_PATH, DEVICE)
 model.to(DEVICE)
 model.eval()
 
-# -----------------------------
-# Preprocessing
-# -----------------------------
-preprocess_input = smp.encoders.get_preprocessing_fn(ENCODER, pretrained="imagenet")
-transform = A.Compose([
-    A.Lambda(image=lambda x, **kwargs: preprocess_input(x).astype("float32")),
-    ToTensorV2()
-])
+preprocess = get_preprocessing(preprocess_input)
 
 # -----------------------------
-# Run inference
+# Inference loop
 # -----------------------------
-with torch.no_grad():
-    for file in sorted(os.listdir(DATA_DIR)):
-        if not file.endswith("_sat.jpg"):
-            continue
+sat_files = glob.glob(f"{DATA_DIR}/*_sat.jpg")
+sat_files.sort()
 
-        img_path = os.path.join(DATA_DIR, file)
-        image = cv2.imread(img_path)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+for img_path in sat_files:
+    sample_id = img_path.split("/")[-1].replace("_sat.jpg", "")
 
-        # preprocess
-        tensor = transform(image=image)["image"].unsqueeze(0).to(DEVICE)  # shape: (1,3,H,W)
+    # load image
+    image = np.array(Image.open(img_path).convert("RGB"), dtype=np.uint8)
+    mask_dummy = np.zeros((image.shape[0], image.shape[1]), dtype=np.uint8)  # dummy mask
 
-        # predict
-        output = model(tensor)  # (1, NUM_CLASSES, H, W)
-        mask = torch.argmax(output, dim=1).squeeze().cpu().numpy()  # (H, W)
+    # preprocessing (to tensor, normalize, etc.)
+    image, _ = preprocess(image, mask_dummy)
+    image = image.unsqueeze(0).to(DEVICE).float()  # ensure float32
 
-        # convert to RGB
-        mask_rgb = mask_to_rgb(mask)
+    # prediction
+    with torch.no_grad():
+        output = model(image)
+        pred_mask = torch.argmax(output, dim=1).squeeze(0).cpu().numpy()
 
-        # save mask as PNG with corresponding name
-        out_name = file.replace("_sat.jpg", "_mask.png")
-        out_path = os.path.join(OUT_DIR, out_name)
-        cv2.imwrite(out_path, cv2.cvtColor(mask_rgb, cv2.COLOR_RGB2BGR))
-
-print(f"Predictions saved to {OUT_DIR}")
+    # convert to RGB mask
+    pred_mask_rgb = mask_to_rgb(pred_mask)
+    out_img = Image.fromarray(pred_mask_rgb)
+    out_img.save(f"{OUTPUT_DIR}/{sample_id}_mask.png")
