@@ -24,12 +24,12 @@ ENCODER_WEIGHTS = "imagenet"
 NUM_CLASSES = 7
 ACTIVATION = None
 
-EPOCHS = 25
+EPOCHS = 10
 BATCH_SIZE = 16
 LR = 1e-4
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
-DROP_SKIP = 4
+DROP_SKIP = [1, 2, 3, 4]
 
 # -----------------------------
 # Print hyperparameters
@@ -136,5 +136,5 @@ for epoch in range(EPOCHS):
     # --- Save best model by mIoU ---
     if val_miou > best_miou:
         best_miou = val_miou
-        save_model(model, f"checkpoints/skip/best_unet_epoch{epoch+1}.pth")
+        # save_model(model, f"checkpoints/skip_2/best_unet_epoch.pth")
         print(f"New best model saved with mIoU: {best_miou:.4f}")
