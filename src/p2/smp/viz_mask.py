@@ -131,4 +131,4 @@ if __name__ == '__main__':
         ind = np.where(masks == c)
         mask[ind[0], ind[1]] = 1
         img = viz_data(img, mask, color=cmap[c])
-        imageio.imsave('./exp.png', np.uint8(img))
+        imageio.imsave('./report_mask/epoch47/0109_viz.png', np.uint8(img))

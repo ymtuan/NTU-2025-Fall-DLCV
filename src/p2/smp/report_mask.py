@@ -12,8 +12,8 @@ from utils import load_model
 # Config
 # -----------------------------
 DATA_DIR = "../../../data_2025/p2_data/validation"
-OUTPUT_DIR = "prediction"
-MODEL_PATH = "checkpoints/ce/best_deeplabv3plus_epoch118.pth"
+OUTPUT_DIR = "report_mask/epoch1"
+MODEL_PATH = "checkpoints/ce/best_deeplabv3plus_epoch1.pth"
 
 ENCODER = "resnet50"
 ENCODER_WEIGHTS = "imagenet"
@@ -43,10 +43,19 @@ model.eval()
 preprocess = get_preprocessing(preprocess_input)
 
 # -----------------------------
+# Select only target samples
+# -----------------------------
+target_ids = {"0018", "0065", "0109"}
+
+sat_files = [
+    f for f in glob.glob(f"{DATA_DIR}/*_sat.jpg")
+    if f.split("/")[-1].replace("_sat.jpg", "") in target_ids
+]
+sat_files.sort()
+
+# -----------------------------
 # Inference loop
 # -----------------------------
-sat_files = glob.glob(f"{DATA_DIR}/*_sat.jpg")
-sat_files.sort()
 
 for img_path in sat_files:
     sample_id = img_path.split("/")[-1].replace("_sat.jpg", "")
