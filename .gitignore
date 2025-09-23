@@ -11,4 +11,6 @@ hw1_data/*
 __pycache__/
 *.pyc
 
-data_2025
+data_2025/
+
+results/
