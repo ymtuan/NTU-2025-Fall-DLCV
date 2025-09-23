@@ -10,4 +10,3 @@ hw1_data/*
 src/
 *.pth
 __pycache__/
-*.pyc
