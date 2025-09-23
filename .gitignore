@@ -7,7 +7,7 @@ hw1_data/*
 
 *zip
 
-wandb/
+src/
 *.pth
 __pycache__/
 *.pyc
