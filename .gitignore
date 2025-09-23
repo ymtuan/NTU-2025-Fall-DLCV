@@ -7,6 +7,8 @@ hw1_data/*
 
 *zip
 
-src/
 *.pth
 __pycache__/
+*.pyc
+
+data_2025
