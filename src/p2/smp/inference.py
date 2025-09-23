@@ -27,7 +27,8 @@ def main():
     NUM_CLASSES = 7
     ACTIVATION = None
 
-    preprocess_input = smp.encoders.get_preprocessing_fn(ENCODER, pretrained=None)
+    preprocess_input = smp.encoders.get_preprocessing_fn(ENCODER, pretrained="imagenet")
+
     model = smp.DeepLabV3Plus(
         encoder_name=ENCODER,
         encoder_weights=None,
@@ -68,6 +69,8 @@ def main():
         pred_mask_rgb = mask_to_rgb(pred_mask)
         out_img = Image.fromarray(pred_mask_rgb)
         out_img.save(output_dir / f"{sample_id}_mask.png")
+
+    print(f"Inference done! Predicted masks are saved in: {output_dir}")
 
 if __name__ == "__main__":
     main()
