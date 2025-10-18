@@ -1,13 +1,13 @@
 import os
 import numpy as np
 from PIL import Image
-from skimage.metrics import mean_squared_error
+from skimage.metrics import mean_squared_error  # Use the imported function
 import argparse
 import pathlib
 
 def calculate_mse_for_folders(folder1, folder2):
     """
-    Calculate MSE between corresponding images in two folders, keeping values in [0, 255].
+    Calculate MSE between corresponding images in two folders with a safety check.
     """
     # Verify folders exist
     if not os.path.exists(folder1):
@@ -27,37 +27,50 @@ def calculate_mse_for_folders(folder1, folder2):
     mse_list = []
     
     for file1, file2 in zip(folder1_files, folder2_files):
-        img1_path = os.path.join(folder1, file1)
-        img2_path = os.path.join(folder2, file2)
-
-        # Load images and convert to RGB, keeping values in [0, 255]
-        img1 = np.array(Image.open(img1_path).convert('RGB'))
-        img2 = np.array(Image.open(img2_path).convert('RGB'))
+        # Load images and convert to RGB
+        img1_pil = Image.open(os.path.join(folder1, file1)).convert('RGB')
+        img2_pil = Image.open(os.path.join(folder2, file2)).convert('RGB')
         
+        # Convert to numpy arrays using a consistent data type (float32) for accurate math
+        img1 = np.array(img1_pil, dtype=np.float32)
+        img2 = np.array(img2_pil, dtype=np.float32)
+        
+        # --- SAFETY CHECK & NORMALIZATION ---
+        # If the generated image's max pixel value is <= 1.0, it's likely in the [0, 1] range.
+        # This is a common output format for neural networks.
+        if np.max(img2) <= 1.0:
+            print(f"Info: Scaling '{file2}' from [0, 1] to [0, 255] range.")
+            img2 = img2 * 255.0
+        
+        # Ensure image shapes are identical before comparison
         if img1.shape != img2.shape:
-            raise ValueError(f"Different image sizes for {file1} and {file2}: {img1.shape} vs {img2.shape}")
+            raise ValueError(f"Different image sizes for {file1} and {file2}. GT is {img1.shape}, Gen is {img2.shape}")
         
-        # Compute MSE directly on [0, 255] scale
+        # Calculate MSE using the scikit-image function
+        # This is equivalent to np.mean((img1 - img2) ** 2) but is cleaner
         mse = mean_squared_error(img1, img2)
         mse_list.append((file1, mse))
     
-    average_mse = np.mean([mse for _, mse in mse_list])
-    return mse_list, average_mse
+    total_mse = np.sum([mse for _, mse in mse_list])
+    return mse_list, total_mse
 
 def evaluate_mse(gt_folder, gen_folder, baseline_mse=20.0):
     """
-    Evaluate MSE and determine if it meets the baseline.
+    Evaluate total MSE and determine if it meets the baseline.
     """
     try:
-        mse_list, average_mse = calculate_mse_for_folders(gt_folder, gen_folder)
-        print(f"MSE per image: {mse_list}")
-        print(f"Average MSE: {average_mse:.4f}")
+        mse_list, total_mse = calculate_mse_for_folders(gt_folder, gen_folder)
+        print("--- MSE Results ---")
+        for file_name, mse_val in mse_list:
+            print(f"  {file_name}: {mse_val:.4f}")
+        print("-------------------")
+        print(f"Total MSE: {total_mse:.4f}")
 
-        if average_mse < baseline_mse:
-            print(f"Pass: Average MSE ({average_mse:.4f}) is below baseline ({baseline_mse}).")
+        if total_mse < baseline_mse:
+            print(f"Pass: Total MSE ({total_mse:.4f}) is below baseline ({baseline_mse}).")
         else:
-            print(f"Fail: Average MSE ({average_mse:.4f}) exceeds baseline ({baseline_mse}).")
-        return average_mse
+            print(f"Fail: Total MSE ({total_mse:.4f}) exceeds baseline ({baseline_mse}).")
+        return total_mse
     except ValueError as e:
         print(f"Error: {e}")
         return None

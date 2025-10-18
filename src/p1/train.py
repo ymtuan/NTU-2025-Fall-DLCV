@@ -21,7 +21,7 @@ from utils import EMA  # Import from utils.py
 def train():
     # hardcoding these here
     n_epoch = 200
-    batch_size = 128
+    batch_size = 64
     n_T = 1000
     device = "cuda" if torch.cuda.is_available() else "cpu"
     n_classes = 10

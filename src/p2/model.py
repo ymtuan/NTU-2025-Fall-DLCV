@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from utils import beta_scheduler
+from utils import get_beta_scheduler
 from UNet import UNet
 from torchvision.utils import save_image
 import os
@@ -17,7 +17,7 @@ class DDIM:
         self.device = device
 
         # Load beta schedule
-        beta = beta_scheduler(n_timestep=self.n_timesteps).to(self.device).float()
+        beta = get_beta_scheduler(n_timestep=self.n_timesteps).to(self.device).float()
         self.beta = beta
         self.alpha = 1.0 - beta
         self.alpha_cumprod = torch.cumprod(self.alpha, dim=0)
