@@ -15,7 +15,7 @@ SVHN_MEAN = [0.5, 0.5, 0.5]
 SVHN_STD = [0.5, 0.5, 0.5]
 
 def load_checkpoint(checkpoint_path, model):
-    state = torch.load(checkpoint_path, map_location="cuda")
+    state = torch.load(checkpoint_path, map_location="cuda", weights_only=True)
     model.load_state_dict(state['state_dict'])
     print(f'Model loaded from {checkpoint_path}')
 

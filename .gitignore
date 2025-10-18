@@ -9,6 +9,9 @@
 *.pyo
 *.bin
 
+*.tgz
+*.ckpt
+
 src/**/*.pth
 
 hw2_data/*

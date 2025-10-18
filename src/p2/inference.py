@@ -24,7 +24,7 @@ def main():
 
     # Load model
     model = UNet()
-    ckpt = torch.load(args.ckpt_path, map_location=device)
+    ckpt = torch.load(args.ckpt_path, map_location=device, weights_only=True)
     model.load_state_dict(ckpt)
     model = model.to(device)
     model.eval()
@@ -44,16 +44,17 @@ def main():
         output_file = os.path.join(args.output_path, f'{base_name}.png')
         
         # Load and process noise
-        noise = torch.load(noise_file)
+        noise = torch.load(noise_file, weights_only=True)
         noise = noise.to(device)
 
         # Generate images using DDIM
         with torch.no_grad():
             generated_images = sampler.ddim_sample(noise, eta=0.0)
-            # Scale from [-1,1] to [0,1]
-            generated_images = (generated_images + 1) / 2
-            # Save without normalization since we already scaled
-            save_image(generated_images, output_file, normalize=False)
+            # Scale from [-1,1] to [0,1] range
+            generated_images = (generated_images + 1) / 2.0
+            # Clamp to ensure values are in [0,1]
+            # generated_images = torch.clamp(generated_images, 0, 1)
+            save_image(generated_images, output_file, normalize=True)
         print(f"Generated {output_file}")
 
 if __name__ == '__main__':

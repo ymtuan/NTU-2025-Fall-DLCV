@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from PIL import Image
-from skimage.metrics import mean_squared_error  # Use the imported function
+import skimage.metrics
 import argparse
 import pathlib
 
@@ -28,27 +28,17 @@ def calculate_mse_for_folders(folder1, folder2):
     
     for file1, file2 in zip(folder1_files, folder2_files):
         # Load images and convert to RGB
-        img1_pil = Image.open(os.path.join(folder1, file1)).convert('RGB')
-        img2_pil = Image.open(os.path.join(folder2, file2)).convert('RGB')
+        img1 = Image.open(os.path.join(folder1, file1)).convert('RGB')
+        img2 = Image.open(os.path.join(folder2, file2)).convert('RGB')
+
+        img1 = np.array(img1)
+        img2 = np.array(img2)
         
-        # Convert to numpy arrays using a consistent data type (float32) for accurate math
-        img1 = np.array(img1_pil, dtype=np.float32)
-        img2 = np.array(img2_pil, dtype=np.float32)
+        # Convert to numpy arrays and ensure proper scaling
+        img1 = np.array(img1).astype(np.float32)
+        img2 = np.array(img2).astype(np.float32)
         
-        # --- SAFETY CHECK & NORMALIZATION ---
-        # If the generated image's max pixel value is <= 1.0, it's likely in the [0, 1] range.
-        # This is a common output format for neural networks.
-        if np.max(img2) <= 1.0:
-            print(f"Info: Scaling '{file2}' from [0, 1] to [0, 255] range.")
-            img2 = img2 * 255.0
-        
-        # Ensure image shapes are identical before comparison
-        if img1.shape != img2.shape:
-            raise ValueError(f"Different image sizes for {file1} and {file2}. GT is {img1.shape}, Gen is {img2.shape}")
-        
-        # Calculate MSE using the scikit-image function
-        # This is equivalent to np.mean((img1 - img2) ** 2) but is cleaner
-        mse = mean_squared_error(img1, img2)
+        mse = skimage.metrics.mean_squared_error(img1, img2)
         mse_list.append((file1, mse))
     
     total_mse = np.sum([mse for _, mse in mse_list])

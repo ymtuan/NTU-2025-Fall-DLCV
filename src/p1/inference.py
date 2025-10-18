@@ -60,7 +60,7 @@ def output_images(save_dir, model_path):
         device=device,
         drop_prob=0.0,
     )
-    ddpm.load_state_dict(torch.load(model_path, map_location=device))
+    ddpm.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     ddpm.to(device)
 
     # Generate for all digits using the single model
