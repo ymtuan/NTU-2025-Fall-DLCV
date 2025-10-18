@@ -8,5 +8,8 @@
 *.pyo
 *.bin
 
+src/**/*.pth
+stable-diffusion/**/*.jpeg
+
 output/*
 hw2_data/*
