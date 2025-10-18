@@ -2,14 +2,13 @@
 #IMPORTANT: make sure that your dataset is stored in a folder with the same as the one specified below
 
 
-*png
-*jpg
+*.png
+*.jpg
+*.jpeg
 *.pyc
 *.pyo
 *.bin
 
 src/**/*.pth
-stable-diffusion/**/*.jpeg
 
-output/*
 hw2_data/*
