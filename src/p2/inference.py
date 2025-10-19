@@ -24,7 +24,7 @@ def main():
 
     # Load model
     model = UNet()
-    ckpt = torch.load(args.ckpt_path, map_location=device, weights_only=True)
+    ckpt = torch.load(args.ckpt_path, map_location=device)
     model.load_state_dict(ckpt)
     model = model.to(device)
     model.eval()
@@ -44,7 +44,7 @@ def main():
         output_file = os.path.join(args.output_path, f'{base_name}.png')
         
         # Load and process noise
-        noise = torch.load(noise_file, weights_only=True)
+        noise = torch.load(noise_file)
         noise = noise.to(device)
 
         # Generate images using DDIM

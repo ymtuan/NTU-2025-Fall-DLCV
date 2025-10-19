@@ -90,8 +90,8 @@ def load_sam2_model(device):
     # SAM2 model ckpt path, you need to run sam2/checkpoints/download_ckpts.sh to download SAM2 model.
     # TAs will use our local path to run this code and use sam2.1_hiera_large for evaluate.  
     # TODO: Modify this path to your downloaded checkpoint path before running.
-    sam2_checkpoint = "./checkpoints/sam2.1_hiera_large.pth"
-    model_cfg = "configs/sam2.1/sam2.1_hiera_l.yaml"
+    sam2_checkpoint = "./checkpoints/sam2.1_hiera_large.pt"
+    model_cfg = "./sam2/configs/sam2.1/sam2.1_hiera_l.yaml"
     if sam2_checkpoint is None or not os.path.exists(sam2_checkpoint):
         raise RuntimeError("You must set sam2_checkpoint to your downloaded SAM2 checkpoint path before running.")
     
@@ -174,6 +174,7 @@ def evaluate_from_json(json_path, input_dir, output_dir):
         device = torch.device("cuda")
     else:
         device = torch.device("cpu")
+
     print(f"Using device: {device}")
 
     # Load SAM2

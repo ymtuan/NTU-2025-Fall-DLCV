@@ -15,3 +15,5 @@
 src/**/*.pth
 
 hw2_data/*
+
+sam2/**/*.pt
