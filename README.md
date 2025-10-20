@@ -11,12 +11,22 @@ To start working on this assignment, you should clone this repository into your 
 
 Note that you should replace `<username>` with your own GitHub username.
 
+
 # Submission Rules
 ### Deadline
 2025/11/12 (Wed.) 23:59
 
 ### Packages
 This homework should be done using python3.10. For a list of packages you are allowed to import in this assignment, please refer to the slide P.45 and P.46.
+You can run the following command to install all the packages listed in the requirements_p1.txt and requirements_p2.txt:
+
+Packages for Problem 1
+
+    pip3 install -r requirements_p1.txt
+
+Packages for Problem 2
+
+    pip3 install -r requirements_p2.txt
 
 TAs will run the P1 and P2 in two different environments, please implement the homework with two different environments to avoid package conflict.
 
