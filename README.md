@@ -6,7 +6,7 @@ Please click [this link](https://docs.google.com/presentation/d/1ptH0ggLx7IWZfgo
 
 To start working on this assignment, you should clone this repository into your local machine by using the following command.
     
-    git clone https://github.com/DLCV-Fall-2025/DLCV-Fall-2025-HW3-<username>.git
+    git clone https://github.com/DLCV-Fall-2025/dlcv-fall-2025-hw3-<username>.git
 
 
 Note that you should replace `<username>` with your own GitHub username.
