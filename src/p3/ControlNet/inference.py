@@ -133,11 +133,6 @@ def main():
             cond = model.get_learned_conditioning([prompt])
             un_cond = model.get_learned_conditioning([""])
         
-        # Create output subdirectory for this condition
-        condition_name = Path(target_filename).stem
-        condition_output_dir = output_dir / condition_name
-        condition_output_dir.mkdir(parents=True, exist_ok=True)
-        
         # Generate one sample per prompt
         # Set seed for reproducibility
         set_seed(args.seed + idx)
@@ -170,7 +165,7 @@ def main():
             x_samples = model.decode_first_stage(samples)
             
             # Save image directly to output_dir with condition name
-            output_path = output_dir / f"{condition_name}.png"
+            output_path = output_dir / f"{target_filename}"
             save_image(x_samples, output_path)
     
     print(f"\nInference complete! Results saved to {args.output_dir}")
