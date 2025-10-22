@@ -10,8 +10,9 @@
 *.bin
 
 *.tgz
-*.ckpt
+*.zip
 
+*.ckpt
 *.pth
 *.pt
 !Classifier.pth
