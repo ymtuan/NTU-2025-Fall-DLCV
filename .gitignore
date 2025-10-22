@@ -12,8 +12,8 @@
 *.tgz
 *.ckpt
 
-src/**/*.pth
+*.pth
+*.pt
+!Classifier.pth
 
 hw2_data/*
-
-sam2/**/*.pt

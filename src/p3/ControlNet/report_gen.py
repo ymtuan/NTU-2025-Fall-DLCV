@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-ControlNet Circle Test - Two simple sets with basic colors
+ControlNet Circle Test - Two simple sets with white border circles on black background
 """
 
 import os
@@ -12,12 +12,12 @@ import subprocess
 import sys
 
 
-def create_circle_control_image(circles, size=512, bg_color=(255, 255, 255)):
+def create_circle_control_image(circles, size=512, bg_color=(0, 0, 0)):
     """
-    Create a control image with circles on white background
+    Create a control image with circles (white border, black fill) on black background
     
     Args:
-        circles: list of dicts with keys 'center', 'radius', 'color'
+        circles: list of dicts with keys 'center', 'radius', 'border_width'
         size: image size
         bg_color: background color (R, G, B)
     
@@ -30,8 +30,10 @@ def create_circle_control_image(circles, size=512, bg_color=(255, 255, 255)):
     for circle in circles:
         cx, cy = circle['center']
         r = circle['radius']
-        color = circle['color']
-        draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=color)
+        border_width = circle.get('border_width', 3)
+        
+        # Draw circle with white border and black fill
+        draw.ellipse([cx-r, cy-r, cx+r, cy+r], fill=(0, 0, 0), outline=(255, 255, 255), width=border_width)
     
     return img
 
@@ -41,20 +43,20 @@ def create_test_data(output_dir):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Set 1: Red and Blue circles (basic colors)
+    # Set 1: Two circles with white borders
     set1_circles = [
-        {'center': (170, 256), 'radius': 60, 'color': (255, 0, 0)},      # red
-        {'center': (342, 256), 'radius': 60, 'color': (0, 0, 255)}       # blue
+        {'center': (101, 152), 'radius': 60, 'border_width': 3},
+        {'center': (342, 277), 'radius': 60, 'border_width': 3}
     ]
     img1 = create_circle_control_image(set1_circles)
     img1_path = output_dir / "circles_set1.png"
     img1.save(img1_path)
     print(f"Created Set 1: {img1_path}")
     
-    # Set 2: Green and Yellow circles (basic colors)
+    # Set 2: Two circles with white borders
     set2_circles = [
-        {'center': (170, 256), 'radius': 60, 'color': (0, 128, 0)},      # green
-        {'center': (342, 256), 'radius': 60, 'color': (255, 255, 0)}     # yellow
+        {'center': (150, 106), 'radius': 60, 'border_width': 3},
+        {'center': (256, 306), 'radius': 60, 'border_width': 3}
     ]
     img2 = create_circle_control_image(set2_circles)
     img2_path = output_dir / "circles_set2.png"
@@ -66,12 +68,12 @@ def create_test_data(output_dir):
         {
             "source": "circles_set1.png",
             "target": "output_set1.png",
-            "prompt": "a red circle and a blue circle with white background"
+            "prompt": "a red circle and a blue circle with pink background"
         },
         {
             "source": "circles_set2.png",
             "target": "output_set2.png",
-            "prompt": "a green circle and a yellow circle with black background"
+            "prompt": "a green circle and a yellow circle with blue background"
         }
     ]
     
@@ -149,8 +151,8 @@ def main():
     os.makedirs(args.test_data_dir, exist_ok=True)
     img1, img2, prompt_path = create_test_data(args.test_data_dir)
     print(f"\nTest data created in: {args.test_data_dir}")
-    print(f"Set 1: Red circle + Blue circle on white background")
-    print(f"Set 2: Green circle + Yellow circle on white background")
+    print(f"Set 1: Two circles with white borders on black background")
+    print(f"Set 2: Two circles with white borders on black background")
     print(f"Prompts file: {prompt_path}")
     
     # Step 2: Run inference
@@ -172,8 +174,8 @@ def main():
             print("\n" + "="*60)
             print("SUCCESS! Generated images saved to:")
             print(f"  {args.output_dir}/")
-            print(f"  - output_set1.png (red & blue)")
-            print(f"  - output_set2.png (green & yellow)")
+            print(f"  - output_set1.png")
+            print(f"  - output_set2.png")
             print("="*60)
             print("\nNext steps:")
             print("1. Compare control images with generated images")
