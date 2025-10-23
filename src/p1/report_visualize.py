@@ -13,6 +13,17 @@ from datetime import datetime
 from model import DDPM, ContextUnet
 from torch.cuda.amp import autocast
 
+def set_seed(seed=42):
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    # Ensure deterministic behavior
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
 class ImageDataset(Dataset):
     def __init__(self, file_path, csv_path, transform=None):
         self.csv_path = csv_path
@@ -68,8 +79,9 @@ def generate_100_grid(save_dir, model_path):
 
     ddpm.eval()
     with torch.no_grad():
-        # Generate 100 samples (10 per digit)
-        n_sample = 100
+        torch.manual_seed(42)
+        # Generate 500 samples (same as inference.py)
+        n_sample = 50 * n_classes
         with torch.autocast(device_type=device):
             x_gen, _ = ddpm.sample(n_sample, (3, 28, 28), device, guide_w=2.0)
 
@@ -80,7 +92,7 @@ def generate_100_grid(save_dir, model_path):
         
         for digit in range(10):
             digit_images = []
-            count = 0
+            # Get first 10 images for this digit (same logic as inference.py)
             for i in range(n_sample):
                 if i % 10 == digit:
                     img = (x_gen[i] + 1) / 2
@@ -92,8 +104,7 @@ def generate_100_grid(save_dir, model_path):
                     elif digit == 1 and first_one is None:
                         first_one = img.clone()
                     
-                    count += 1
-                    if count == 10:
+                    if len(digit_images) == 10:
                         break
             
             grid_images.extend(digit_images)
@@ -178,6 +189,8 @@ if __name__ == "__main__":
     parser.add_argument('--output_image_dir', type=pathlib.Path, required=False, default='report_images/')
     parser.add_argument("--model_path", type=pathlib.Path, required=False, default='checkpoints/model_199.pth')
     args = parser.parse_args()
+
+    set_seed(42)
     
     os.makedirs(args.output_image_dir, exist_ok=True)
 

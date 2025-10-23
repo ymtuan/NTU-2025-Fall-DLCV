@@ -62,8 +62,6 @@ class ImageDataset(Dataset):
 
 def output_images(save_dir, model_path):
 
-    set_seed(42)
-
     n_T = 1000
     device = "cuda" if torch.cuda.is_available() else "cpu"
     n_classes = 10
@@ -89,6 +87,7 @@ def output_images(save_dir, model_path):
     ddpm.eval()
     with torch.no_grad():
         n_sample = 50 * n_classes
+        torch.manual_seed(42)
         with torch.autocast(device_type=device):
             x_gen, _ = ddpm.sample(n_sample, (3, 28, 28), device, guide_w=2.0)
 
@@ -104,6 +103,8 @@ if __name__ == "__main__":
     parser.add_argument('--output_image_dir', type=pathlib.Path, required=False, default='output')
     parser.add_argument("--model_path", type=pathlib.Path, required=False, default='checkpoints/model_199.pth')
     args = parser.parse_args()
+
+    set_seed(42)
     
     os.makedirs(args.output_image_dir, exist_ok=True)
 

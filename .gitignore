@@ -21,3 +21,6 @@
 hw2_data/*
 checkpoints/*
 !checkpoints/.gitkeep
+
+src/taming-transformers/
+src/clip/
