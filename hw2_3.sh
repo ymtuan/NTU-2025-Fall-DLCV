@@ -37,6 +37,3 @@ python3 src/p3/ControlNet/inference.py \
     --output_dir "$OUTPUT_DIR" \
     --model_ckpt "$MODEL_CKPT" \
     --config "$CONFIG_PATH_ABS" \
-
-
-echo "Inference completed!"

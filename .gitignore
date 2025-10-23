@@ -11,6 +11,7 @@
 
 *.tgz
 *.zip
+*.tar
 
 *.ckpt
 *.pth
@@ -18,3 +19,5 @@
 !Classifier.pth
 
 hw2_data/*
+checkpoints/*
+!checkpoints/.gitkeep

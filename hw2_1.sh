@@ -17,6 +17,4 @@ mkdir -p "$OUTPUT_DIR"
 # Run inference script to generate 500 images
 python3 src/p1/inference.py \
     --output_image_dir "$OUTPUT_DIR" \
-    --model_path src/p1/checkpoints/model_199.pth \
-
-echo "Generated 500 images saved to: $OUTPUT_DIR"
+    --model_path checkpoints/p1.pth \
