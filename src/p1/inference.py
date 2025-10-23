@@ -13,6 +13,18 @@ from datetime import datetime
 from model import DDPM, ContextUnet  # Import from model.py
 from torch.cuda.amp import autocast
 
+def set_seed(seed=42):
+    import random
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+    # Ensure deterministic behavior
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+
+
 class ImageDataset(Dataset):
     def __init__(self, file_path, csv_path, transform=None):
         self.csv_path = csv_path
@@ -49,6 +61,9 @@ class ImageDataset(Dataset):
         return len(self.files)
 
 def output_images(save_dir, model_path):
+
+    set_seed(42)
+
     n_T = 1000
     device = "cuda" if torch.cuda.is_available() else "cpu"
     n_classes = 10

@@ -6,7 +6,7 @@
 bash hw2_download_ckpt.sh
 
 # Download test dataset and unzip
-gdown 16EndCsxegWWqPSsQwCvpfynlSoE2slAc -O test_data.zip
+gdown 1-jBoXNaW5hcb8yvSRmiWILPZnjeiXBxP -O test_data.zip
 unzip ./test_data.zip -d ./
 
 mkdir -p outputs
