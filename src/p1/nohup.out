@@ -1,0 +1,18 @@
+/home/ymtuan/miniconda3/envs/hw3_p1/lib/python3.10/site-packages/torch/cuda/__init__.py:546: UserWarning: Can't initialize NVML
+  warnings.warn("Can't initialize NVML")
+/home/ymtuan/.local/lib/python3.10/site-packages/huggingface_hub/file_download.py:945: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
+  warnings.warn(
+Loading model from ../../llava-v1.5-7b/...
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.48s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.42s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.73s/it]
+Loading annotations from ../../hw3_data/p1_data/val.json...
+Processed 100/1000
+Processed 200/1000
+Processed 300/1000
+Processed 400/1000
+Processed 500/1000
+Processed 600/1000
+Processed 700/1000
+Processed 800/1000
+Processed 900/1000
+Processed 1000/1000
+Saved predictions to output/p1_1_pred.json
