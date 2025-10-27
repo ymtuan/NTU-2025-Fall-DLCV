@@ -5,3 +5,5 @@ hw3_data/
 *.zip
 
 *.bin
+
+*_log.txt
