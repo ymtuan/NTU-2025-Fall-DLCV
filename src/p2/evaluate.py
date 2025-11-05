@@ -130,8 +130,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
 
     parser.add_argument("--pred_file", help="Prediction json file")
-    parser.add_argument("--images_root", default="p2_data/images/val/", help="Image root")
-    parser.add_argument("--annotation_file", default="p2_data/val.json", help="Annotation json file")
+    parser.add_argument("--images_root", default="../../hw3_data/p2_data/images/val/", help="Image root")
+    parser.add_argument("--annotation_file", default="../../hw3_data/p2_data/val.json", help="Annotation json file")
 
     args = parser.parse_args()
 

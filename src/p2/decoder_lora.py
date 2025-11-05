@@ -47,10 +47,11 @@ class Qwen3MLP(nn.Module):
         self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=False)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=False)
         self.act_fn = nn.functional.silu
+        self.dropout = nn.Dropout(0.1)  # small regularization
 
     def forward(self, x):
         down_proj = self.down_proj(self.act_fn(self.gate_proj(x)) * self.up_proj(x))
-        return down_proj
+        return self.dropout(down_proj)  # dropout on MLP output
 
 
 def rotate_half(x):
@@ -189,6 +190,7 @@ class Qwen3Attention(nn.Module):
         )
         self.q_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)  
         self.k_norm = Qwen3RMSNorm(self.head_dim, eps=config.rms_norm_eps)  
+        self.attn_dropout = 0.1  # small attention dropout
 
     def forward(
         self,
@@ -207,7 +209,6 @@ class Qwen3Attention(nn.Module):
         query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
 
         attention_interface: Callable = eager_attention_forward
-       
         attn_output, attn_weights = attention_interface(
             self,
             query_states,
@@ -215,6 +216,7 @@ class Qwen3Attention(nn.Module):
             value_states,
             attention_mask,
             scaling=self.scaling,
+            dropout=self.attn_dropout,  # enable during training
         )
 
         attn_output = attn_output.reshape(*input_shape, -1).contiguous()
@@ -373,26 +375,33 @@ class Decoder(nn.Module):
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
-        # Build attention mask: allow visual prefix tokens to be visible to all text tokens.
+        # Strict causal mask + per-sample key padding mask (for padded text tokens)
         if attention_mask is None:
             batch_size, seq_len = hidden_states.size(0), hidden_states.size(1)
+            device = hidden_states.device
 
-            # text causal mask (for text tokens only)
-            text_len = seq_len - v_len
-            if text_len <= 0:
-                # only visual tokens present => no causal restriction
-                causal_mask = torch.zeros((seq_len, seq_len), device=hidden_states.device, dtype=torch.bool)
-            else:
-                # build mask: for i,j both in text region and j>i -> mask True
-                text_causal = torch.triu(torch.ones((text_len, text_len), device=hidden_states.device, dtype=torch.bool), diagonal=1)
-                # assemble full mask:
-                causal_mask = torch.zeros((seq_len, seq_len), device=hidden_states.device, dtype=torch.bool)
-                # visual rows/cols remain unmasked (visual tokens can attend to visual + text)
-                # text rows, visual cols: allow (False)
-                # text rows, text cols: apply text_causal
-                causal_mask[v_len:, v_len:] = text_causal
+            # causal mask (S,S), True means masked
+            causal_mask_2d = torch.triu(
+                torch.ones((seq_len, seq_len), device=device, dtype=torch.bool), diagonal=1
+            )
+            attention_mask = causal_mask_2d.unsqueeze(0).unsqueeze(1).expand(batch_size, 1, seq_len, seq_len)
 
-            attention_mask = causal_mask.unsqueeze(0).unsqueeze(0).expand(batch_size, 1, seq_len, seq_len)
+            # add key-padding mask over text pads if input_ids are provided
+            if input_ids is not None:
+                # number of valid text tokens per sample (excluding PAD_ID)
+                valid_text_len = (input_ids != self.padding_idx).sum(dim=-1)  # (B,)
+                # positions index [0..S-1]
+                positions = torch.arange(seq_len, device=device).unsqueeze(0).expand(batch_size, seq_len)  # (B,S)
+                # cutoff per sample is v_len + valid_text_len
+                cutoff = (valid_text_len + (seq_len - input_ids.size(1))).unsqueeze(1)  # shape (B,1) if v_len>0
+                # v_len = seq_len - input_ids.size(1) because we concatenated [vision, text]
+                # mask keys at positions >= cutoff, but never mask visual prefix [0:v_len)
+                key_padding = positions >= cutoff  # (B,S) True where key is PAD in text part
+                v_len = seq_len - input_ids.size(1)
+                if v_len > 0:
+                    key_padding[:, :v_len] = False
+                # broadcast to (B,1,1,S) and OR with causal mask
+                attention_mask = attention_mask | key_padding.unsqueeze(1).unsqueeze(2)
 
         for decoder_layer in self.layers[: self.config.num_hidden_layers]:
             hidden_states = decoder_layer(
@@ -407,17 +416,39 @@ class Decoder(nn.Module):
 
         return logits
 
-    def generate(self, input_ids, max_new_tokens=50, eos_token_id=None, vision_embeds: Optional[torch.FloatTensor] = None):
+    def generate(self, input_ids, max_new_tokens=50, eos_token_id=None, vision_embeds: Optional[torch.FloatTensor] = None, min_new_tokens: int = 5):
         """
         Simple autoregressive generation that preserves visual prefix if provided.
-        input_ids: initial text ids (without visual prefix tokens)
-        vision_embeds: optional visual features to prepend (B, v_len, vision_dim)
+        Enforces a minimum number of tokens before EOS to mitigate early-EOS collapse.
         """
-        # Prepare initial hidden with vision prefix; we pass vision_embeds to forward each step.
-        for _ in range(max_new_tokens):
+        batch_size = input_ids.size(0)
+        device = input_ids.device
+        finished = torch.zeros(batch_size, dtype=torch.bool, device=device)
+
+        for step in range(max_new_tokens):
             outputs = self(input_ids=input_ids, vision_embeds=vision_embeds)
-            next_token = torch.argmax(outputs[:, -1, :], dim=-1, keepdim=True)
+            raw_next = torch.argmax(outputs[:, -1, :], dim=-1)
+
+            if eos_token_id is not None:
+                allow_eos = step + 1 >= min_new_tokens
+                if allow_eos:
+                    newly_finished = raw_next.eq(eos_token_id)
+                    finished = finished | newly_finished
+                    next_token = torch.where(finished, torch.full_like(raw_next, eos_token_id), raw_next)
+                else:
+                    # force not-eos before min_new_tokens by replacing eos with top-2 choice
+                    if (raw_next == eos_token_id).any():
+                        logits_step = outputs[:, -1, :]
+                        top2 = torch.topk(logits_step, k=2, dim=-1).indices
+                        alt = torch.where(top2[:, 0] == eos_token_id, top2[:, 1], top2[:, 0])
+                        raw_next = torch.where(raw_next == eos_token_id, alt, raw_next)
+                    next_token = raw_next
+            else:
+                next_token = raw_next
+
+            next_token = next_token.unsqueeze(-1)
             input_ids = torch.cat([input_ids, next_token], dim=-1)
-            if eos_token_id is not None and next_token.item() == eos_token_id:
+
+            if eos_token_id is not None and finished.all().item():
                 break
         return input_ids

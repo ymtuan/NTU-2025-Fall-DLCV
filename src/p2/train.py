@@ -13,8 +13,9 @@ from tokenization_qwen3 import Qwen3Tokenizer
 from evaluate import CIDERScore, CLIPScore
 from torch.utils.data import Subset
 import random
+import math  # added
 
-# Configs (tweak as needed)
+# Configs
 device = "cuda" if torch.cuda.is_available() else "cpu"
 images_root = "../../hw3_data/p2_data/images/train"
 ann_file = "../../hw3_data/p2_data/train.json"
@@ -23,14 +24,15 @@ merges_file = "merges.txt"
 
 batch_size = 8
 epochs = 15
-lr = 3e-4
+lr = 1e-4  # lower LR for LoRA stability
 r = 4
 alpha = 16
 
 # add validation files (used to compute best checkpoint)
-save_periodic_every = 5  # save extra backup every N epochs
-internal_val_frac = 0.05  # fraction of train set to use as internal validation
+save_periodic_every = 20  # save extra backup every N epochs
+internal_val_frac = 0.1  # fraction of train set to use as internal validation
 split_seed = 42  # reproducible split
+patience = 3     # early stop if CIDEr doesn't improve for N epochs
 
 def freeze_module(m):
     for p in m.parameters():
@@ -43,7 +45,7 @@ def unfreeze_named(model, substrs):
 
 def evaluate(decoder, encoder, val_loader, device, pad_id=151643):
     decoder.eval()
-    ce = nn.CrossEntropyLoss(ignore_index=pad_id)
+    ce = nn.CrossEntropyLoss(ignore_index=pad_id, label_smoothing=0.05)  # small smoothing
     total_loss = 0.0
     total_batches = 0
     with torch.no_grad():
@@ -106,14 +108,27 @@ def main():
     unfreeze_named(decoder, ["lora_down", "lora_up", "visual_projection"])
     print("trainable params:", count_trainable_params(decoder))
 
-    optim = torch.optim.AdamW([p for p in decoder.parameters() if p.requires_grad], lr=lr)
+    optim = torch.optim.AdamW([p for p in decoder.parameters() if p.requires_grad], lr=lr, weight_decay=0.01)
+
     pad_id = 151643
-    ce = nn.CrossEntropyLoss(ignore_index=pad_id)
+    ce = nn.CrossEntropyLoss(ignore_index=pad_id, label_smoothing=0.05)  # small smoothing
+
+    # scheduler: 5% warmup then cosine decay
+    steps_per_epoch = max(1, len(dl))
+    total_steps = epochs * steps_per_epoch
+    warmup_steps = max(1, int(0.05 * total_steps))
+    def lr_lambda(step):
+        if step < warmup_steps:
+            return float(step + 1) / float(warmup_steps)
+        prog = (step - warmup_steps) / max(1, (total_steps - warmup_steps))
+        return 0.5 * (1.0 + math.cos(math.pi * prog))
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optim, lr_lambda=lr_lambda)
 
     best_val_loss = float("inf")
     best_epoch = -1
     best_cider = -1.0
     best_epoch_by_cider = -1
+    epochs_without_improve = 0  # track no-improve epochs
 
     for epoch in range(epochs):
         decoder.train()
@@ -141,6 +156,7 @@ def main():
             loss.backward()
             torch.nn.utils.clip_grad_norm_([p for p in decoder.parameters() if p.requires_grad], max_norm=1.0)
             optim.step()
+            scheduler.step()  # step scheduler per iteration
 
             running_loss += loss.item()
             avg_loss = running_loss / batch_idx
@@ -179,7 +195,13 @@ def main():
                 img_names = batch["img_names"]
                 vision_feats = encoder.extract(images).to(device)
                 start_ids = torch.full((len(images),1), tokenizer.encoder["<|im_start|>"], dtype=torch.long).to(device)
-                preds_ids = decoder.generate(start_ids, max_new_tokens=30, eos_token_id=tokenizer.encoder["<|im_end|>"], vision_embeds=vision_feats)
+                preds_ids = decoder.generate(
+                    start_ids,
+                    max_new_tokens=30,
+                    eos_token_id=tokenizer.encoder["<|im_end|>"],
+                    vision_embeds=vision_feats,
+                    min_new_tokens=5,  # prevent early EOS
+                )
                 for i, pid in enumerate(preds_ids):
                     text = tokenizer.decode(pid.cpu().tolist())
                     text = text.replace("<|im_start|>", "").replace("<|im_end|>", "").strip()
@@ -202,20 +224,29 @@ def main():
 
         # save last epoch adapters
         os.makedirs("checkpoints", exist_ok=True)
-        save_adapters(decoder, f"checkpoints/adapters_epoch{epoch}.pt")
+        save_adapters(decoder, f"checkpoints/adapters_epoch{epoch+1}.pt")
         save_adapters(decoder, f"checkpoints/adapters_last.pt")
         # select best by CIDEr
         if cider_score > best_cider:
             best_cider = cider_score
-            best_epoch_by_cider = epoch
+            best_epoch_by_cider = epoch+1
             save_adapters(decoder, "checkpoints/adapters_best_by_cider.pt")
-            tqdm.write(f"New best-by-CIDEr adapters saved at epoch {epoch} (CIDEr={cider_score:.4f})")
+            tqdm.write(f"New best-by-CIDEr adapters saved at epoch {epoch+1} (CIDEr={cider_score:.4f})")
+            epochs_without_improve = 0
+        else:
+            epochs_without_improve += 1
+
         # periodic backup
         if (epoch + 1) % save_periodic_every == 0:
             save_adapters(decoder, f"checkpoints/adapters_epoch{epoch}_backup.pt")
             tqdm.write(f"Periodic backup saved for epoch {epoch}")
 
-        tqdm.write(f"Epoch {epoch} finished. best_epoch_by_cider={best_epoch_by_cider} best_cider={best_cider:.4f}")
+        tqdm.write(f"Epoch {epoch+1} finished. best_epoch_by_cider={best_epoch_by_cider} best_cider={best_cider:.4f}")
+
+        # Early stopping
+        if epochs_without_improve >= patience:
+            tqdm.write(f"No CIDEr improvement for {patience} epochs. Early stopping at epoch {epoch+1}.")
+            break
 
 if __name__ == "__main__":
     main()

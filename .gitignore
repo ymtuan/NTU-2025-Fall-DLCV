@@ -6,4 +6,4 @@ hw3_data/
 
 *.bin
 
-*_log.txt
+src/p2/checkpoints/
