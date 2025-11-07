@@ -6,4 +6,6 @@ hw3_data/
 
 *.bin
 
-src/p2/checkpoints/
+*.pyc
+
+src/p2/checkpoints*/

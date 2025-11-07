@@ -14,9 +14,9 @@ images_root = "../../hw3_data/p2_data/images/val/"
 ann_file = "../../hw3_data/p2_data/val.json"
 vocab_file = "vocab.json"
 merges_file = "merges.txt"
-adapter_path = "checkpoints/adapters_epoch1.pt"  # use best checkpoint
-r = 4
-alpha = 16
+adapter_path = "checkpoints/adapters_epoch3.pt"
+r = 16
+alpha = 64
 
 def main():
     encoder = ViTEncoder(device=device)
@@ -73,7 +73,7 @@ def main():
                 key = os.path.splitext(img_names[i])[0]
                 results[key] = text
     
-    with open("pred.json", "w", encoding="utf-8") as f:
+    with open("config_2_epoch_3.json", "w", encoding="utf-8") as f:
         json.dump(results, f, ensure_ascii=False, indent=2)
     print(f"Saved predictions to pred.json ({len(results)} samples)")
 

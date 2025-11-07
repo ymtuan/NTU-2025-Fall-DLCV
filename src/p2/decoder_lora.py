@@ -6,7 +6,7 @@ import math
 
 class Config:
 
-    def __init__(self):
+    def __init__(self):  # FIXED: was ____
         self.vocab_size=151936
         self.hidden_size=1024
         self.intermediate_size=3072
@@ -309,7 +309,9 @@ class Decoder(nn.Module):
         # Keep small MLP to respect parameter budget
         self.vision_dim = vision_dim
         self.visual_projection = nn.Sequential(
-            nn.Linear(vision_dim, config.hidden_size, bias=False),
+            nn.Linear(vision_dim, 2048, bias=False),  # intermediate expansion
+            nn.GELU(),
+            nn.Linear(2048, config.hidden_size, bias=False),
             nn.LayerNorm(config.hidden_size)
         )
 
