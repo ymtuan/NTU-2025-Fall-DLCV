@@ -1,6 +1,22 @@
 import json
 import sys
 from collections import defaultdict
+import re
+
+def _normalize_yes_no(text):
+    if text is None:
+        return None
+    t = text.strip().lower()
+    # Take first alphanumeric token
+    tokens = re.findall(r"[a-zA-Z]+", t)
+    if not tokens:
+        return None
+    first = tokens[0]
+    if first in ("yes", "y"):
+        return "Yes"
+    if first in ("no", "n"):
+        return "No"
+    return None
 
 def evaluate_accuracy(pred_file, annotation_file):
     """
@@ -24,13 +40,15 @@ def evaluate_accuracy(pred_file, annotation_file):
     with open(annotation_file) as f:
         annotations = json.load(f)
     
-    # Create a mapping of question_id to ground truth
+    # Build gt_map using provided question_id if exists
     gt_map = {}
     for i, item in enumerate(annotations):
-        answer = item['answer'].lower().strip()
-        # Normalize answer to "Yes" or "No"
-        gt_answer = "Yes" if answer in ["yes", "y"] else "No"
-        gt_map[i] = gt_answer
+        qid = item.get("question_id", i)
+        gt_ans = _normalize_yes_no(item.get("answer", ""))
+        if gt_ans is None:
+            # Fallback: treat anything not recognized as "No"
+            gt_ans = "No"
+        gt_map[qid] = gt_ans
     
     print(f"Total annotations: {len(gt_map)}")
     print(f"Total predictions: {len(predictions)}")
@@ -38,10 +56,10 @@ def evaluate_accuracy(pred_file, annotation_file):
     # Calculate accuracy
     correct = 0
     total = 0
-    
+    ambiguous = 0
     for pred in predictions:
-        question_id = pred['question_id']
-        predicted_answer = pred['text'].strip()
+        question_id = pred.get('question_id')
+        predicted_answer_raw = pred.get('text', '')
         
         if question_id not in gt_map:
             print(f"Warning: question_id {question_id} not found in annotations")
@@ -49,20 +67,21 @@ def evaluate_accuracy(pred_file, annotation_file):
         
         ground_truth = gt_map[question_id]
         
-        # Normalize prediction to "Yes" or "No"
-        pred_normalized = "Yes" if "yes" in predicted_answer.lower() else "No"
-        
+        pred_normalized = _normalize_yes_no(predicted_answer_raw)
+        if pred_normalized is None:
+            ambiguous += 1
+            pred_normalized = "No"  # default instead of substring heuristic
         if pred_normalized == ground_truth:
             correct += 1
-        
         total += 1
     
     accuracy = correct / total if total > 0 else 0.0
     
     print(f"\n{'='*50}")
-    print(f"Evaluation Results")
+    print("Evaluation Results")
     print(f"{'='*50}")
     print(f"Correct: {correct}/{total}")
+    print(f"Ambiguous predictions (fallback applied): {ambiguous}")
     print(f"Accuracy: {accuracy:.4f}")
     print(f"{'='*50}\n")
     

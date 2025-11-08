@@ -306,7 +306,6 @@ class Decoder(nn.Module):
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
 
         # Visual projection: map vision token features to decoder hidden size
-        # Keep small MLP to respect parameter budget
         self.vision_dim = vision_dim
         self.visual_projection = nn.Sequential(
             nn.Linear(vision_dim, 2048, bias=False),  # intermediate expansion

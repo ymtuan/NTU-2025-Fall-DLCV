@@ -1,18 +1,17 @@
-/home/ymtuan/miniconda3/envs/hw3_p1/lib/python3.10/site-packages/torch/cuda/__init__.py:546: UserWarning: Can't initialize NVML
-  warnings.warn("Can't initialize NVML")
 /home/ymtuan/.local/lib/python3.10/site-packages/huggingface_hub/file_download.py:945: FutureWarning: `resume_download` is deprecated and will be removed in version 1.0.0. Downloads always resume when possible. If you want to force a new download, use `force_download=True`.
   warnings.warn(
 Loading model from ../../llava-v1.5-7b/...
-Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.48s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.42s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.73s/it]
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:05<00:05,  5.34s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.37s/it]Loading checkpoint shards: 100%|██████████| 2/2 [00:07<00:00,  3.66s/it]
+VCD Parameters: alpha=1.5, beta=0.3, noise_step=500
 Loading annotations from ../../hw3_data/p1_data/val.json...
-Processed 100/1000
-Processed 200/1000
-Processed 300/1000
-Processed 400/1000
-Processed 500/1000
-Processed 600/1000
-Processed 700/1000
-Processed 800/1000
-Processed 900/1000
-Processed 1000/1000
-Saved predictions to output/p1_1_pred.json
+Processed 100/1000 | 0.88s/img | ETA: 13.2min
+Processed 200/1000 | 0.88s/img | ETA: 11.7min
+Processed 300/1000 | 0.87s/img | ETA: 10.2min
+Processed 400/1000 | 0.87s/img | ETA: 8.7min
+Processed 500/1000 | 0.87s/img | ETA: 7.3min
+Processed 600/1000 | 0.87s/img | ETA: 5.8min
+Processed 700/1000 | 0.87s/img | ETA: 4.4min
+Processed 800/1000 | 0.87s/img | ETA: 2.9min
+Processed 900/1000 | 0.87s/img | ETA: 1.4min
+Processed 1000/1000 | 0.87s/img | ETA: 0.0min
+Saved predictions to output/p1_2_fix_pred.json

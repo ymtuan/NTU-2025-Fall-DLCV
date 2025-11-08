@@ -13,6 +13,23 @@ from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from vcd_utils.vcd_add_noise import add_diffusion_noise
 from PIL import Image
 import torch
+from llava.conversation import conv_templates, SeparatorStyle
+
+
+def _normalize_yes_no(text):
+    if text is None:
+        return "No"
+    import re
+    tokens = re.findall(r"[a-zA-Z]+", text.strip().lower())
+    if not tokens:
+        return "No"
+    # Scan first few tokens to reduce false "No" bias
+    for t in tokens[:3]:
+        if t in ("yes", "y"):
+            return "Yes"
+        if t in ("no", "n"):
+            return "No"
+    return "No"  # revert neutral default (no Yes bias)
 
 
 def load_model(model_path):
@@ -24,6 +41,8 @@ def load_model(model_path):
         model_name=get_model_name_from_path(model_path),
         device_map=device_map
     )
+    model.eval()
+    
     return tokenizer, model, image_processor
 
 
@@ -45,25 +64,26 @@ def get_llava_vcd_response(image_path, question, tokenizer, model, image_process
     Returns:
         prediction: "Yes" or "No"
     """
-    # Load and process image
-    image = Image.open(image_path).convert('RGB')
-    image_tensor = process_images([image], image_processor, model.config)
-    image_tensor = image_tensor.to(model.device, dtype=torch.float16)
+    # Load and process image (no caching)
+    try:
+        image = Image.open(image_path).convert('RGB')
+    except Exception:
+        return "No"
+    image_tensor = process_images([image], image_processor, model.config).to(model.device, dtype=torch.float16)
+    image_tensor_cd = add_diffusion_noise(image_tensor, noise_step=noise_step).to(model.device, dtype=torch.float16)
     
-    # Add diffusion noise for contrastive decoding (provided by TAs)
-    image_tensor_cd = add_diffusion_noise(image_tensor, noise_step=noise_step)
-    image_tensor_cd = image_tensor_cd.to(model.device, dtype=torch.float16)
-    
-    # Prepare prompt
-    inp = f"{DEFAULT_IMAGE_TOKEN}\n{question}"
+    # Use proper LLaVA conversation template (simple form)
+    conv = conv_templates["llava_v1"].copy()
+    conv.append_message(conv.roles[0], f"{DEFAULT_IMAGE_TOKEN}\n{question}")
+    conv.append_message(conv.roles[1], None)
+    prompt = conv.get_prompt()
     
     # Tokenize
     input_ids = tokenizer_image_token(
-        inp, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
+        prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
     ).unsqueeze(0).to(model.device)
     
     # Generate response with VCD
-    # do_sample=True enables sampling (required for VCD)
     with torch.no_grad():
         output_ids = model.generate(
             input_ids,
@@ -72,24 +92,21 @@ def get_llava_vcd_response(image_path, question, tokenizer, model, image_process
             cd_alpha=cd_alpha,
             cd_beta=cd_beta,
             do_sample=True,
-            max_new_tokens=10,
-            use_cache=True,
-            temperature=0.7  # Control randomness
+            max_new_tokens=8,       # reduced from 16 for speed
+            temperature=0.1,
+            top_k=10,
+            top_p=0.9,
+            use_cache=True
         )
     
     # Extract only the generated part (remove input tokens)
     input_len = input_ids.shape[1]
     generated_ids = output_ids[:, input_len:]
-    
+    if generated_ids.shape[1] == 0:
+        return "No"
     # Decode response
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-    
-    # Parse response to "Yes" or "No"
-    response_lower = response.lower()
-    if "yes" in response_lower:
-        return "Yes"
-    else:
-        return "No"
+    return _normalize_yes_no(response)
 
 
 def main(annotation_file, images_root, llava_weight_path, output_file, 
@@ -109,9 +126,14 @@ def main(annotation_file, images_root, llava_weight_path, output_file,
     
     results = []
     
+    # Add batch progress logging
+    import time
+    start_time = time.time()
+    
     for i, item in enumerate(data):
         image_source = item['image_source']
         question = item['question']
+        qid = item.get("question_id", i)
         
         # Construct image path
         image_path = os.path.join(images_root, f"{image_source}.jpg")
@@ -128,24 +150,33 @@ def main(annotation_file, images_root, llava_weight_path, output_file,
                 image_path, question, tokenizer, model, image_processor,
                 cd_alpha=cd_alpha, cd_beta=cd_beta, noise_step=noise_step
             )
-        except Exception as e:
-            print(f"Error processing {image_source}: {e}")
+        except Exception:
             pred = "No"
-        
         results.append({
             "image_id": image_source,
-            "question_id": i,
+            "question_id": qid,
             "text": pred
         })
         
         if (i + 1) % 100 == 0:
-            print(f"Processed {i + 1}/{len(data)}")
+            elapsed = time.time() - start_time
+            per_img = elapsed / (i + 1)
+            remaining = per_img * (len(data) - i - 1)
+            print(f"Processed {i + 1}/{len(data)} | {per_img:.2f}s/img | ETA: {remaining/60:.1f}min")
     
-    # Save output
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    # Save output (manual pretty)
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
-    
+        f.write('[\n')
+        for idx, obj in enumerate(results):
+            line = json.dumps(obj, ensure_ascii=False)
+            if idx < len(results) - 1:
+                f.write(f"  {line},\n")
+            else:
+                f.write(f"  {line}\n")
+        f.write(']\n')
     print(f"Saved predictions to {output_file}")
 
 
@@ -159,10 +190,9 @@ if __name__ == "__main__":
     llava_weight_path = sys.argv[3]
     output_file = sys.argv[4]
     
-    cd_alpha = float(sys.argv[5]) if len(sys.argv) > 5 else 1.0
-    cd_beta = float(sys.argv[6]) if len(sys.argv) > 6 else 0.5
+    cd_alpha = float(sys.argv[5]) if len(sys.argv) > 5 else 1.5  # restore earlier defaults
+    cd_beta = float(sys.argv[6]) if len(sys.argv) > 6 else 0.3
     noise_step = int(sys.argv[7]) if len(sys.argv) > 7 else 500
     
     main(annotation_file, images_root, llava_weight_path, output_file, 
          cd_alpha=cd_alpha, cd_beta=cd_beta, noise_step=noise_step)
-    

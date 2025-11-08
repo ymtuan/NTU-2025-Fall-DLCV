@@ -5,8 +5,23 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 from llava.model.builder import load_pretrained_model
 from llava.mm_utils import get_model_name_from_path, process_images, tokenizer_image_token
 from llava.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
+from llava.conversation import conv_templates, SeparatorStyle
 from PIL import Image
 import torch
+
+def _normalize_yes_no(text):
+    if text is None:
+        return "No"
+    import re
+    tokens = re.findall(r"[a-zA-Z]+", text.strip().lower())
+    if not tokens:
+        return "No"
+    first = tokens[0]
+    if first in ("yes", "y"):
+        return "Yes"
+    if first in ("no", "n"):
+        return "No"
+    return "No"
 
 # Load pretrained LLaVA model
 def load_model(model_path):
@@ -17,6 +32,7 @@ def load_model(model_path):
         model_name=get_model_name_from_path(model_path),
         device_map=device_map
     )
+    model.eval()
     return tokenizer, model, image_processor
 
 def get_llava_response(image_path, question, tokenizer, model, image_processor):
@@ -25,16 +41,23 @@ def get_llava_response(image_path, question, tokenizer, model, image_processor):
     Returns: "Yes" or "No"
     """
     # Load and process image
-    image = Image.open(image_path).convert('RGB')
+    try:
+        image = Image.open(image_path).convert('RGB')
+    except Exception as e:
+        print(f"Image load error: {e}")
+        return "No"
     image_tensor = process_images([image], image_processor, model.config)
     image_tensor = image_tensor.to(model.device, dtype=torch.float16)
     
-    # Prepare prompt
-    inp = f"{DEFAULT_IMAGE_TOKEN}\n{question}"
+    # Use proper LLaVA conversation template
+    conv = conv_templates["llava_v1"].copy()
+    conv.append_message(conv.roles[0], f"{DEFAULT_IMAGE_TOKEN}\n{question}")
+    conv.append_message(conv.roles[1], None)
+    prompt = conv.get_prompt()
     
     # Tokenize
     input_ids = tokenizer_image_token(
-        inp, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
+        prompt, tokenizer, IMAGE_TOKEN_INDEX, return_tensors='pt'
     ).unsqueeze(0).to(model.device)
     
     # Generate response
@@ -42,8 +65,8 @@ def get_llava_response(image_path, question, tokenizer, model, image_processor):
         output_ids = model.generate(
             input_ids,
             images=image_tensor,
-            do_sample=False,
-            max_new_tokens=10,
+            do_sample=False,      # greedy - standard baseline
+            max_new_tokens=16,
             use_cache=True
         )
     
@@ -51,15 +74,15 @@ def get_llava_response(image_path, question, tokenizer, model, image_processor):
     input_len = input_ids.shape[1]
     generated_ids = output_ids[:, input_len:]
     
+    # If no tokens were generated, return "No"
+    if generated_ids.shape[1] == 0:
+        return "No"
+    
     # Decode response
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
     
-    # Parse response to "Yes" or "No"
-    response_lower = response.lower()
-    if "yes" in response_lower:
-        return "Yes"
-    else:
-        return "No"
+    normalized = _normalize_yes_no(response)
+    return normalized  # Return only the normalized response
 
 def main(annotation_file, images_root, llava_weight_path, output_file):
     """Main inference function"""
@@ -78,6 +101,7 @@ def main(annotation_file, images_root, llava_weight_path, output_file):
     for i, item in enumerate(data):
         image_source = item['image_source']
         question = item['question']
+        qid = item.get("question_id", i)
         
         # Construct image path
         image_path = os.path.join(images_root, f"{image_source}.jpg")
@@ -93,18 +117,26 @@ def main(annotation_file, images_root, llava_weight_path, output_file):
         
         results.append({
             "image_id": image_source,
-            "question_id": i,
+            "question_id": qid,
             "text": pred
         })
         
         if (i + 1) % 100 == 0:
             print(f"Processed {i + 1}/{len(data)}")
     
-    # Save output
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    # Save output (manual pretty list with one object per line)
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
-    
+        f.write('[\n')
+        for idx, obj in enumerate(results):
+            line = json.dumps(obj, ensure_ascii=False)
+            if idx < len(results) - 1:
+                f.write(f"  {line},\n")
+            else:
+                f.write(f"  {line}\n")
+        f.write(']\n')
     print(f"Saved predictions to {output_file}")
 
 if __name__ == "__main__":
