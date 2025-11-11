@@ -8,3 +8,7 @@ hw3_data/
 
 *.pyc
 
+llava-v1.5-7b/
+outputs/
+
+evaluate.py
