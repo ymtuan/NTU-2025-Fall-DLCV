@@ -21,56 +21,81 @@ def _normalize_yes_no(text):
 def evaluate_accuracy(pred_file, annotation_file):
     """
     Evaluate accuracy on POPE dataset
-    
-    Args:
-        pred_file: path to predictions JSON (output from inference)
-        annotation_file: path to ground truth JSON
-    
-    Returns:
-        accuracy: float between 0 and 1
     """
     
-    # Load predictions
+    # Load predictions (support array JSON and NDJSON)
     print(f"Loading predictions from {pred_file}...")
-    with open(pred_file) as f:
-        predictions = json.load(f)
+    predictions = []
+    try:
+        with open(pred_file, 'r', encoding='utf-8') as f:
+            first_char = f.read(1)
+            f.seek(0)
+            if first_char == '[':
+                predictions = json.load(f)
+            else:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        try:
+                            predictions.append(json.loads(line))
+                        except Exception as e:
+                            print(f"Warning: skip unparsable line. Error: {e}")
+    except Exception as e:
+        print(f"Error reading predictions: {e}")
+        sys.exit(1)
     
     # Load ground truth annotations
     print(f"Loading annotations from {annotation_file}...")
-    with open(annotation_file) as f:
+    with open(annotation_file, 'r', encoding='utf-8') as f:
         annotations = json.load(f)
     
-    # Build gt_map using provided question_id if exists
-    gt_map = {}
+    # Build GT maps: by question_id and by (image_source, question)
+    gt_by_qid = {}
+    gt_by_pair = {}
     for i, item in enumerate(annotations):
         qid = item.get("question_id", i)
         gt_ans = _normalize_yes_no(item.get("answer", ""))
         if gt_ans is None:
-            # Fallback: treat anything not recognized as "No"
             gt_ans = "No"
-        gt_map[qid] = gt_ans
+        gt_by_qid[qid] = gt_ans
+        key = (item.get("image_source"), item.get("question"))
+        gt_by_pair[key] = gt_ans
     
-    print(f"Total annotations: {len(gt_map)}")
+    print(f"Total annotations: {len(annotations)}")
     print(f"Total predictions: {len(predictions)}")
     
-    # Calculate accuracy
+    # Calculate accuracy with flexible matching
     correct = 0
     total = 0
     ambiguous = 0
+    unmatched = 0
     for pred in predictions:
-        question_id = pred.get('question_id')
-        predicted_answer_raw = pred.get('text', '')
-        
-        if question_id not in gt_map:
-            print(f"Warning: question_id {question_id} not found in annotations")
-            continue
-        
-        ground_truth = gt_map[question_id]
-        
+        # Normalize predicted answer
+        predicted_answer_raw = pred.get('predict', '')
         pred_normalized = _normalize_yes_no(predicted_answer_raw)
         if pred_normalized is None:
             ambiguous += 1
-            pred_normalized = "No"  # default instead of substring heuristic
+            pred_normalized = "No"
+        
+        # Match strategy: question_id -> (image_source, question)
+        matched = False
+        ground_truth = None
+        
+        qid = pred.get('question_id')
+        if qid is not None and qid in gt_by_qid:
+            ground_truth = gt_by_qid[qid]
+            matched = True
+        else:
+            key = (pred.get('image_source'), pred.get('question'))
+            if key in gt_by_pair:
+                ground_truth = gt_by_pair[key]
+                matched = True
+        
+        if not matched:
+            print(f"Warning: could not match prediction to annotation for image_source={pred.get('image_source')} question={pred.get('question')}")
+            unmatched += 1
+            continue
+        
         if pred_normalized == ground_truth:
             correct += 1
         total += 1
@@ -80,6 +105,7 @@ def evaluate_accuracy(pred_file, annotation_file):
     print(f"\n{'='*50}")
     print("Evaluation Results")
     print(f"{'='*50}")
+    print(f"Matched: {total} | Unmatched: {unmatched}")
     print(f"Correct: {correct}/{total}")
     print(f"Ambiguous predictions (fallback applied): {ambiguous}")
     print(f"Accuracy: {accuracy:.4f}")

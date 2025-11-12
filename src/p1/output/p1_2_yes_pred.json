@@ -7,12 +7,12 @@
   {
     "image_source": "COCO_val2014_000000485564",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000265719",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000038645",
@@ -27,17 +27,17 @@
   {
     "image_source": "COCO_val2014_000000299074",
     "question": "Is there a cell phone in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000123570",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000379404",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000318550",
@@ -72,7 +72,7 @@
   {
     "image_source": "COCO_val2014_000000329717",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000560744",
@@ -167,12 +167,12 @@
   {
     "image_source": "COCO_val2014_000000287305",
     "question": "Is there a truck in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000018150",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000154846",
@@ -182,7 +182,7 @@
   {
     "image_source": "COCO_val2014_000000287035",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000381195",
@@ -192,7 +192,7 @@
   {
     "image_source": "COCO_val2014_000000318209",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000405205",
@@ -202,7 +202,7 @@
   {
     "image_source": "COCO_val2014_000000407386",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000204100",
@@ -222,7 +222,7 @@
   {
     "image_source": "COCO_val2014_000000199940",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000191964",
@@ -237,7 +237,7 @@
   {
     "image_source": "COCO_val2014_000000551881",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000560064",
@@ -247,7 +247,7 @@
   {
     "image_source": "COCO_val2014_000000343401",
     "question": "Is there a stop sign in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000167724",
@@ -262,7 +262,7 @@
   {
     "image_source": "COCO_val2014_000000456178",
     "question": "Is there a bus in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000163575",
@@ -307,7 +307,7 @@
   {
     "image_source": "COCO_val2014_000000327038",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000283168",
@@ -347,7 +347,7 @@
   {
     "image_source": "COCO_val2014_000000318204",
     "question": "Is there a horse in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000293564",
@@ -382,12 +382,12 @@
   {
     "image_source": "COCO_val2014_000000360600",
     "question": "Is there a fork in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000113701",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000353096",
@@ -397,7 +397,7 @@
   {
     "image_source": "COCO_val2014_000000383185",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000170517",
@@ -422,7 +422,7 @@
   {
     "image_source": "COCO_val2014_000000368541",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000574790",
@@ -472,7 +472,7 @@
   {
     "image_source": "COCO_val2014_000000559547",
     "question": "Is there a baseball glove in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000040361",
@@ -487,12 +487,12 @@
   {
     "image_source": "COCO_val2014_000000201148",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000349936",
     "question": "Is there an oven in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000560064",
@@ -517,7 +517,7 @@
   {
     "image_source": "COCO_val2014_000000307166",
     "question": "Is there an oven in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000437347",
@@ -532,7 +532,7 @@
   {
     "image_source": "COCO_val2014_000000093948",
     "question": "Is there a mouse in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000325347",
@@ -552,7 +552,7 @@
   {
     "image_source": "COCO_val2014_000000252135",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000199959",
@@ -572,7 +572,7 @@
   {
     "image_source": "COCO_val2014_000000192660",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000309371",
@@ -607,7 +607,7 @@
   {
     "image_source": "COCO_val2014_000000207205",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000526321",
@@ -677,7 +677,7 @@
   {
     "image_source": "COCO_val2014_000000233426",
     "question": "Is there a potted plant in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000007795",
@@ -707,7 +707,7 @@
   {
     "image_source": "COCO_val2014_000000354976",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000199764",
@@ -722,7 +722,7 @@
   {
     "image_source": "COCO_val2014_000000579415",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000387098",
@@ -732,7 +732,7 @@
   {
     "image_source": "COCO_val2014_000000052689",
     "question": "Is there a bench in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000021327",
@@ -777,7 +777,7 @@
   {
     "image_source": "COCO_val2014_000000430052",
     "question": "Is there a bird in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000023731",
@@ -817,7 +817,7 @@
   {
     "image_source": "COCO_val2014_000000044520",
     "question": "Is there a train in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000141278",
@@ -832,7 +832,7 @@
   {
     "image_source": "COCO_val2014_000000263594",
     "question": "Is there a truck in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000069189",
@@ -867,7 +867,7 @@
   {
     "image_source": "COCO_val2014_000000191964",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000114710",
@@ -932,7 +932,7 @@
   {
     "image_source": "COCO_val2014_000000318209",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000378751",
@@ -942,7 +942,7 @@
   {
     "image_source": "COCO_val2014_000000354229",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000551908",
@@ -972,7 +972,7 @@
   {
     "image_source": "COCO_val2014_000000350898",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000348524",
@@ -997,7 +997,7 @@
   {
     "image_source": "COCO_val2014_000000318550",
     "question": "Is there a truck in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000421455",
@@ -1047,12 +1047,12 @@
   {
     "image_source": "COCO_val2014_000000327532",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000329717",
     "question": "Is there a suitcase in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000068418",
@@ -1192,7 +1192,7 @@
   {
     "image_source": "COCO_val2014_000000196462",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000304387",
@@ -1212,12 +1212,12 @@
   {
     "image_source": "COCO_val2014_000000263594",
     "question": "Is there a truck in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000011241",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000311759",
@@ -1252,7 +1252,7 @@
   {
     "image_source": "COCO_val2014_000000472375",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000163814",
@@ -1262,12 +1262,12 @@
   {
     "image_source": "COCO_val2014_000000376959",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000318550",
     "question": "Is there a traffic light in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000355342",
@@ -1282,7 +1282,7 @@
   {
     "image_source": "COCO_val2014_000000147165",
     "question": "Is there a toaster in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000567886",
@@ -1297,12 +1297,12 @@
   {
     "image_source": "COCO_val2014_000000442809",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000259755",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000421455",
@@ -1337,7 +1337,7 @@
   {
     "image_source": "COCO_val2014_000000007795",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000093948",
@@ -1377,7 +1377,7 @@
   {
     "image_source": "COCO_val2014_000000307262",
     "question": "Is there a fork in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000007795",
@@ -1392,7 +1392,7 @@
   {
     "image_source": "COCO_val2014_000000184338",
     "question": "Is there a bed in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000236865",
@@ -1412,7 +1412,7 @@
   {
     "image_source": "COCO_val2014_000000456178",
     "question": "Is there a motorcycle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000252135",
@@ -1427,7 +1427,7 @@
   {
     "image_source": "COCO_val2014_000000061507",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000559547",
@@ -1482,12 +1482,12 @@
   {
     "image_source": "COCO_val2014_000000506178",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000358255",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000175506",
@@ -1517,7 +1517,7 @@
   {
     "image_source": "COCO_val2014_000000383185",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000388983",
@@ -1527,7 +1527,7 @@
   {
     "image_source": "COCO_val2014_000000299074",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000574057",
@@ -1557,12 +1557,12 @@
   {
     "image_source": "COCO_val2014_000000511341",
     "question": "Is there a laptop in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000327532",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000414516",
@@ -1577,7 +1577,7 @@
   {
     "image_source": "COCO_val2014_000000016451",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000456552",
@@ -1637,7 +1637,7 @@
   {
     "image_source": "COCO_val2014_000000396338",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000452297",
@@ -1717,7 +1717,7 @@
   {
     "image_source": "COCO_val2014_000000307262",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000564336",
@@ -1727,7 +1727,7 @@
   {
     "image_source": "COCO_val2014_000000117527",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000224155",
@@ -1757,7 +1757,7 @@
   {
     "image_source": "COCO_val2014_000000350898",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000186709",
@@ -1767,7 +1767,7 @@
   {
     "image_source": "COCO_val2014_000000246999",
     "question": "Is there a couch in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000478736",
@@ -1777,7 +1777,7 @@
   {
     "image_source": "COCO_val2014_000000545353",
     "question": "Is there a sink in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000097994",
@@ -1877,7 +1877,7 @@
   {
     "image_source": "COCO_val2014_000000226097",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000415727",
@@ -1887,7 +1887,7 @@
   {
     "image_source": "COCO_val2014_000000525667",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000175437",
@@ -1902,7 +1902,7 @@
   {
     "image_source": "COCO_val2014_000000407386",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000283168",
@@ -1927,22 +1927,22 @@
   {
     "image_source": "COCO_val2014_000000572260",
     "question": "Is there an apple in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000197219",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000447787",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000084410",
     "question": "Is there a vase in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000303534",
@@ -1977,12 +1977,12 @@
   {
     "image_source": "COCO_val2014_000000200583",
     "question": "Is there a bench in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000257327",
     "question": "Is there a vase in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000231589",
@@ -2002,7 +2002,7 @@
   {
     "image_source": "COCO_val2014_000000300368",
     "question": "Is there a knife in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000534516",
@@ -2012,7 +2012,7 @@
   {
     "image_source": "COCO_val2014_000000538236",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000203479",
@@ -2037,7 +2037,7 @@
   {
     "image_source": "COCO_val2014_000000465346",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000325347",
@@ -2047,7 +2047,7 @@
   {
     "image_source": "COCO_val2014_000000526321",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000501652",
@@ -2057,7 +2057,7 @@
   {
     "image_source": "COCO_val2014_000000088507",
     "question": "Is there an orange in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000391735",
@@ -2077,7 +2077,7 @@
   {
     "image_source": "COCO_val2014_000000538236",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000465418",
@@ -2107,7 +2107,7 @@
   {
     "image_source": "COCO_val2014_000000482275",
     "question": "Is there a vase in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000316700",
@@ -2122,7 +2122,7 @@
   {
     "image_source": "COCO_val2014_000000288042",
     "question": "Is there a truck in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000564336",
@@ -2137,7 +2137,7 @@
   {
     "image_source": "COCO_val2014_000000500680",
     "question": "Is there a sink in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000227204",
@@ -2147,7 +2147,7 @@
   {
     "image_source": "COCO_val2014_000000465346",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000238029",
@@ -2157,7 +2157,7 @@
   {
     "image_source": "COCO_val2014_000000113701",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000383185",
@@ -2222,12 +2222,12 @@
   {
     "image_source": "COCO_val2014_000000569839",
     "question": "Is there a tie in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000480122",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000377879",
@@ -2242,7 +2242,7 @@
   {
     "image_source": "COCO_val2014_000000551881",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000555538",
@@ -2302,12 +2302,12 @@
   {
     "image_source": "COCO_val2014_000000073182",
     "question": "Is there a bicycle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000550514",
     "question": "Is there a snowboard in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000401398",
@@ -2327,12 +2327,12 @@
   {
     "image_source": "COCO_val2014_000000560744",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000429913",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000455157",
@@ -2342,7 +2342,7 @@
   {
     "image_source": "COCO_val2014_000000449432",
     "question": "Is there a refrigerator in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000358255",
@@ -2377,7 +2377,7 @@
   {
     "image_source": "COCO_val2014_000000573796",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000529668",
@@ -2442,7 +2442,7 @@
   {
     "image_source": "COCO_val2014_000000226097",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000418471",
@@ -2467,7 +2467,7 @@
   {
     "image_source": "COCO_val2014_000000277289",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000088507",
@@ -2497,7 +2497,7 @@
   {
     "image_source": "COCO_val2014_000000447787",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000354976",
@@ -2507,7 +2507,7 @@
   {
     "image_source": "COCO_val2014_000000407386",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000569839",
@@ -2522,7 +2522,7 @@
   {
     "image_source": "COCO_val2014_000000336872",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000418680",
@@ -2557,7 +2557,7 @@
   {
     "image_source": "COCO_val2014_000000226097",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000167724",
@@ -2587,7 +2587,7 @@
   {
     "image_source": "COCO_val2014_000000307262",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000084410",
@@ -2602,7 +2602,7 @@
   {
     "image_source": "COCO_val2014_000000500257",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000257327",
@@ -2647,7 +2647,7 @@
   {
     "image_source": "COCO_val2014_000000378873",
     "question": "Is there a truck in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000313162",
@@ -2672,7 +2672,7 @@
   {
     "image_source": "COCO_val2014_000000211674",
     "question": "Is there a potted plant in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000044993",
@@ -2692,7 +2692,7 @@
   {
     "image_source": "COCO_val2014_000000052689",
     "question": "Is there a bench in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000383185",
@@ -2717,7 +2717,7 @@
   {
     "image_source": "COCO_val2014_000000188958",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000142056",
@@ -2777,7 +2777,7 @@
   {
     "image_source": "COCO_val2014_000000249715",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000238029",
@@ -2892,7 +2892,7 @@
   {
     "image_source": "COCO_val2014_000000467887",
     "question": "Is there a mouse in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000283412",
@@ -2917,7 +2917,7 @@
   {
     "image_source": "COCO_val2014_000000505335",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000148766",
@@ -2977,7 +2977,7 @@
   {
     "image_source": "COCO_val2014_000000287035",
     "question": "Is there a book in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000574057",
@@ -2987,7 +2987,7 @@
   {
     "image_source": "COCO_val2014_000000142056",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000288042",
@@ -3037,17 +3037,17 @@
   {
     "image_source": "COCO_val2014_000000407386",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000287035",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000153300",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000463542",
@@ -3087,7 +3087,7 @@
   {
     "image_source": "COCO_val2014_000000245642",
     "question": "Is there a motorcycle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000465346",
@@ -3107,7 +3107,7 @@
   {
     "image_source": "COCO_val2014_000000011241",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000097994",
@@ -3142,7 +3142,7 @@
   {
     "image_source": "COCO_val2014_000000429580",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000418471",
@@ -3202,7 +3202,7 @@
   {
     "image_source": "COCO_val2014_000000332025",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000069189",
@@ -3252,7 +3252,7 @@
   {
     "image_source": "COCO_val2014_000000114941",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000388983",
@@ -3282,7 +3282,7 @@
   {
     "image_source": "COCO_val2014_000000237767",
     "question": "Is there a traffic light in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000574057",
@@ -3337,7 +3337,7 @@
   {
     "image_source": "COCO_val2014_000000226097",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000316700",
@@ -3372,7 +3372,7 @@
   {
     "image_source": "COCO_val2014_000000366141",
     "question": "Is there a book in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000246145",
@@ -3437,7 +3437,7 @@
   {
     "image_source": "COCO_val2014_000000094944",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000468997",
@@ -3507,7 +3507,7 @@
   {
     "image_source": "COCO_val2014_000000327532",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000418471",
@@ -3562,7 +3562,7 @@
   {
     "image_source": "COCO_val2014_000000354229",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000465275",
@@ -3612,7 +3612,7 @@
   {
     "image_source": "COCO_val2014_000000007795",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000382617",
@@ -3622,7 +3622,7 @@
   {
     "image_source": "COCO_val2014_000000249715",
     "question": "Is there a cell phone in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000252135",
@@ -3632,7 +3632,7 @@
   {
     "image_source": "COCO_val2014_000000007795",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000157084",
@@ -3662,7 +3662,7 @@
   {
     "image_source": "COCO_val2014_000000303099",
     "question": "Is there a sink in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000365822",
@@ -3702,7 +3702,7 @@
   {
     "image_source": "COCO_val2014_000000140983",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000391735",
@@ -3727,7 +3727,7 @@
   {
     "image_source": "COCO_val2014_000000354088",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000456552",
@@ -3777,7 +3777,7 @@
   {
     "image_source": "COCO_val2014_000000277289",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000524979",
@@ -3792,7 +3792,7 @@
   {
     "image_source": "COCO_val2014_000000436127",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000309371",
@@ -3822,7 +3822,7 @@
   {
     "image_source": "COCO_val2014_000000300368",
     "question": "Is there a knife in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000560744",
@@ -3892,7 +3892,7 @@
   {
     "image_source": "COCO_val2014_000000329717",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000331366",
@@ -3932,7 +3932,7 @@
   {
     "image_source": "COCO_val2014_000000343967",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000098493",
@@ -3947,7 +3947,7 @@
   {
     "image_source": "COCO_val2014_000000094944",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000437347",
@@ -3967,12 +3967,12 @@
   {
     "image_source": "COCO_val2014_000000032610",
     "question": "Is there a bench in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000327532",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000178078",
@@ -3982,7 +3982,7 @@
   {
     "image_source": "COCO_val2014_000000311327",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000093948",
@@ -4022,7 +4022,7 @@
   {
     "image_source": "COCO_val2014_000000114941",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000557016",
@@ -4042,7 +4042,7 @@
   {
     "image_source": "COCO_val2014_000000299074",
     "question": "Is there a cell phone in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000310196",
@@ -4062,7 +4062,7 @@
   {
     "image_source": "COCO_val2014_000000021645",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000061507",
@@ -4072,7 +4072,7 @@
   {
     "image_source": "COCO_val2014_000000355256",
     "question": "Is there a knife in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000189694",
@@ -4092,12 +4092,12 @@
   {
     "image_source": "COCO_val2014_000000279499",
     "question": "Is there a person in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000153865",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000236370",
@@ -4182,7 +4182,7 @@
   {
     "image_source": "COCO_val2014_000000318204",
     "question": "Is there a horse in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000189694",
@@ -4192,12 +4192,12 @@
   {
     "image_source": "COCO_val2014_000000538236",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000365822",
     "question": "Is there a potted plant in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000244455",
@@ -4267,7 +4267,7 @@
   {
     "image_source": "COCO_val2014_000000369541",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000579415",
@@ -4277,7 +4277,7 @@
   {
     "image_source": "COCO_val2014_000000478736",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000309371",
@@ -4297,7 +4297,7 @@
   {
     "image_source": "COCO_val2014_000000230175",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000037900",
@@ -4342,7 +4342,7 @@
   {
     "image_source": "COCO_val2014_000000295377",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000211674",
@@ -4362,22 +4362,22 @@
   {
     "image_source": "COCO_val2014_000000498100",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000153300",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000505933",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000378873",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000354229",
@@ -4387,7 +4387,7 @@
   {
     "image_source": "COCO_val2014_000000016775",
     "question": "Is there a cell phone in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000172648",
@@ -4412,7 +4412,7 @@
   {
     "image_source": "COCO_val2014_000000307262",
     "question": "Is there a fork in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000273450",
@@ -4447,7 +4447,7 @@
   {
     "image_source": "COCO_val2014_000000034773",
     "question": "Is there a frisbee in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000190788",
@@ -4472,7 +4472,7 @@
   {
     "image_source": "COCO_val2014_000000153300",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000149592",
@@ -4517,7 +4517,7 @@
   {
     "image_source": "COCO_val2014_000000006033",
     "question": "Is there a suitcase in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000033270",
@@ -4527,7 +4527,7 @@
   {
     "image_source": "COCO_val2014_000000516916",
     "question": "Is there a tv in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000337502",
@@ -4537,7 +4537,7 @@
   {
     "image_source": "COCO_val2014_000000336872",
     "question": "Is there a bowl in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000455157",
@@ -4572,7 +4572,7 @@
   {
     "image_source": "COCO_val2014_000000538236",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000574057",
@@ -4582,7 +4582,7 @@
   {
     "image_source": "COCO_val2014_000000197219",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000222118",
@@ -4592,7 +4592,7 @@
   {
     "image_source": "COCO_val2014_000000196462",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000017708",
@@ -4617,7 +4617,7 @@
   {
     "image_source": "COCO_val2014_000000125524",
     "question": "Is there a stop sign in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000405205",
@@ -4627,12 +4627,12 @@
   {
     "image_source": "COCO_val2014_000000419453",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000429580",
     "question": "Is there a parking meter in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000418680",
@@ -4662,7 +4662,7 @@
   {
     "image_source": "COCO_val2014_000000387098",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000332625",
@@ -4677,12 +4677,12 @@
   {
     "image_source": "COCO_val2014_000000076416",
     "question": "Is there a bicycle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000196462",
     "question": "Is there a cup in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000015738",
@@ -4727,7 +4727,7 @@
   {
     "image_source": "COCO_val2014_000000123570",
     "question": "Is there a dining table in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000025972",
@@ -4747,12 +4747,12 @@
   {
     "image_source": "COCO_val2014_000000277289",
     "question": "Is there a chair in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000153300",
     "question": "Is there a spoon in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000295377",
@@ -4772,12 +4772,12 @@
   {
     "image_source": "COCO_val2014_000000167724",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000429580",
     "question": "Is there a car in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000186709",
@@ -4852,7 +4852,7 @@
   {
     "image_source": "COCO_val2014_000000338291",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000500257",
@@ -4882,17 +4882,17 @@
   {
     "image_source": "COCO_val2014_000000134075",
     "question": "Is there a bottle in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000396338",
     "question": "Is there a backpack in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000140983",
     "question": "Is there a bed in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000462805",
@@ -4922,7 +4922,7 @@
   {
     "image_source": "COCO_val2014_000000040361",
     "question": "Is there a sports ball in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000367528",
@@ -4942,12 +4942,12 @@
   {
     "image_source": "COCO_val2014_000000246999",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000353180",
     "question": "Is there a handbag in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000123570",
@@ -4957,7 +4957,7 @@
   {
     "image_source": "COCO_val2014_000000240434",
     "question": "Is there a clock in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000068418",
@@ -4977,7 +4977,7 @@
   {
     "image_source": "COCO_val2014_000000183965",
     "question": "Is there a hot dog in the image?",
-    "predict": "no"
+    "predict": "yes"
   },
   {
     "image_source": "COCO_val2014_000000102906",
@@ -4997,6 +4997,6 @@
   {
     "image_source": "COCO_val2014_000000307166",
     "question": "Is there an oven in the image?",
-    "predict": "no"
+    "predict": "yes"
   }
 ]

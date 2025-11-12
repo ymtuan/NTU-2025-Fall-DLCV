@@ -11,17 +11,17 @@ import torch
 
 def _normalize_yes_no(text):
     if text is None:
-        return "No"
+        return "no"
     import re
     tokens = re.findall(r"[a-zA-Z]+", text.strip().lower())
     if not tokens:
-        return "No"
+        return "no"
     first = tokens[0]
     if first in ("yes", "y"):
-        return "Yes"
+        return "yes"
     if first in ("no", "n"):
-        return "No"
-    return "No"
+        return "no"
+    return "no" 
 
 # Load pretrained LLaVA model
 def load_model(model_path):
@@ -38,20 +38,21 @@ def load_model(model_path):
 def get_llava_response(image_path, question, tokenizer, model, image_processor):
     """
     Get LLaVA model response for a yes/no question
-    Returns: "Yes" or "No"
+    Returns: "yes" or "no"
     """
     # Load and process image
     try:
         image = Image.open(image_path).convert('RGB')
     except Exception as e:
         print(f"Image load error: {e}")
-        return "No"
+        return "no"
     image_tensor = process_images([image], image_processor, model.config)
     image_tensor = image_tensor.to(model.device, dtype=torch.float16)
     
     # Use proper LLaVA conversation template
     conv = conv_templates["llava_v1"].copy()
-    conv.append_message(conv.roles[0], f"{DEFAULT_IMAGE_TOKEN}\n{question}")
+    # Add instruction to answer strictly with yes/no
+    conv.append_message(conv.roles[0], f"{DEFAULT_IMAGE_TOKEN}\nAnswer the question with a single yes/no.\n{question}")
     conv.append_message(conv.roles[1], None)
     prompt = conv.get_prompt()
     
@@ -66,7 +67,7 @@ def get_llava_response(image_path, question, tokenizer, model, image_processor):
             input_ids,
             images=image_tensor,
             do_sample=False,      # greedy - standard baseline
-            max_new_tokens=16,
+            max_new_tokens=1,
             use_cache=True
         )
     
@@ -74,9 +75,9 @@ def get_llava_response(image_path, question, tokenizer, model, image_processor):
     input_len = input_ids.shape[1]
     generated_ids = output_ids[:, input_len:]
     
-    # If no tokens were generated, return "No"
+    # If no tokens were generated, return "no"
     if generated_ids.shape[1] == 0:
-        return "No"
+        return "no"
     
     # Decode response
     response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
@@ -116,9 +117,9 @@ def main(annotation_file, images_root, llava_weight_path, output_file):
         pred = get_llava_response(image_path, question, tokenizer, model, image_processor)
         
         results.append({
-            "image_id": image_source,
-            "question_id": qid,
-            "text": pred
+            "image_source": image_source,
+            "question": question,
+            "predict": pred
         })
         
         if (i + 1) % 100 == 0:
@@ -128,14 +129,17 @@ def main(annotation_file, images_root, llava_weight_path, output_file):
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-    with open(output_file, 'w') as f:
+    with open(output_file, 'w', encoding='utf-8') as f:
         f.write('[\n')
         for idx, obj in enumerate(results):
-            line = json.dumps(obj, ensure_ascii=False)
+            f.write('  {\n')
+            f.write(f'    "image_source": "{obj["image_source"]}",\n')
+            f.write(f'    "question": "{obj["question"]}",\n')
+            f.write(f'    "predict": "{obj["predict"]}"\n')
             if idx < len(results) - 1:
-                f.write(f"  {line},\n")
+                f.write('  },\n')
             else:
-                f.write(f"  {line}\n")
+                f.write('  }\n')
         f.write(']\n')
     print(f"Saved predictions to {output_file}")
 
