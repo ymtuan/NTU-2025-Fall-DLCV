@@ -53,9 +53,9 @@ def parse_args():
                         help="Path to source images directory")
     parser.add_argument("--output_dir", type=str, default="outputs/",
                         help="Path to output directory")
-    parser.add_argument("--model_ckpt", type=str, default="lightning_logs/version_3/checkpoints/epoch=2-step=37424.ckpt",
+    parser.add_argument("--model_ckpt", type=str, default="checkpoints/p3.ckpt",
                         help="Path to ControlNet model checkpoint (your trained weights)")
-    parser.add_argument("--sd_model", type=str, default="../../../stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt",
+    parser.add_argument("--sd_model", type=str, default="checkpoints/p3.ckpt",
                         help="Path to Stable Diffusion base checkpoint (TA-provided)")
     parser.add_argument("--config", type=str, default="models/cldm_v15.yaml",
                         help="Path to model config")
