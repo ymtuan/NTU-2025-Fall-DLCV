@@ -54,9 +54,9 @@ def parse_args():
     parser.add_argument("--output_dir", type=str, default="outputs/",
                         help="Path to output directory")
     parser.add_argument("--model_ckpt", type=str, default="lightning_logs/version_3/checkpoints/epoch=2-step=37424.ckpt",
-                        help="Path to ControlNet model checkpoint")
+                        help="Path to ControlNet model checkpoint (your trained weights)")
     parser.add_argument("--sd_model", type=str, default="../../../stable-diffusion/models/ldm/stable-diffusion-v1/model.ckpt",
-                        help="Path to SD model checkpoint")
+                        help="Path to Stable Diffusion base checkpoint (TA-provided)")
     parser.add_argument("--config", type=str, default="models/cldm_v15.yaml",
                         help="Path to model config")
     parser.add_argument("--num_samples", type=int, default=1,
@@ -82,18 +82,30 @@ def main():
     set_seed(args.seed)
     
     print(f"Device: {device}")
-    print(f"Loading model from {args.model_ckpt}")
-    
     # Load model
     model = create_model(args.config).to(device)
+
+    # First load SD base (TA-provided) with strict=False
+    if args.sd_model and os.path.exists(args.sd_model):
+        print(f"Loading SD base from {args.sd_model}")
+        sd_base = load_state_dict(args.sd_model, location=device)
+        _m_sd, _u_sd = model.load_state_dict(sd_base, strict=False)
+    else:
+        print(f"Warning: SD base checkpoint not found: {args.sd_model}")
+
+    # Then load your ControlNet weights to fill control_model.* (strict=False)
+    if not os.path.exists(args.model_ckpt):
+        print(f"Error: ControlNet checkpoint not found: {args.model_ckpt}", file=sys.stderr)
+        sys.exit(1)
+    print(f"Loading ControlNet from {args.model_ckpt}")
     load_dict = load_state_dict(args.model_ckpt, location=device)
     m, u = model.load_state_dict(load_dict, strict=False)
-    
+
     if len(m) > 0:
         print(f"Missing keys: {m}")
     if len(u) > 0:
         print(f"Unexpected keys: {u}")
-    
+
     model = model.eval()
     
     # Create DDIM sampler
@@ -166,6 +178,7 @@ def main():
             
             # Save image directly to output_dir with condition name
             output_path = output_dir / f"{target_filename}"
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             save_image(x_samples, output_path)
     
     print(f"\nInference complete! Results saved to {args.output_dir}")
