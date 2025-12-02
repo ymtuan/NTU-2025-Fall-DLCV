@@ -1,0 +1,14 @@
+
+hw3_data/
+
+*.png
+*.zip
+
+*.bin
+
+*.pyc
+
+llava-v1.5-7b/
+outputs/
+
+evaluate.py
