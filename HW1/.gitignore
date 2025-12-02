@@ -1,0 +1,16 @@
+#Ignore the dataset
+#IMPORTANT: make sure that your dataset is stored in a folder with the same as the one specified below
+
+hw1_data/*
+*png
+*jpg
+
+*zip
+
+*.pth
+__pycache__/
+*.pyc
+
+data_2025/
+
+results/

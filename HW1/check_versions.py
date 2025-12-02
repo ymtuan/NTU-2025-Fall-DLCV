@@ -1,0 +1,37 @@
+import sys
+import gdown
+import tqdm
+import glob
+import yaml
+import transformers
+import timm
+import sklearn
+import pandas
+import tensorboard
+import einops
+import imageio
+import matplotlib
+import numpy
+import Pillow
+import scipy
+import torch
+import torchvision
+
+print(f"Python: {sys.version}")
+print(f"gdown: {gdown.__version__}")
+print(f"tqdm: {tqdm.__version__}")
+print(f"glob: built-in module")
+print(f"yaml: {yaml.__version__}")
+print(f"transformers: {transformers.__version__}")
+print(f"timm: {timm.__version__}")
+print(f"scikit-learn: {sklearn.__version__}")
+print(f"pandas: {pandas.__version__}")
+print(f"tensorboard: {tensorboard.__version__}")
+print(f"einops: {einops.__version__}")
+print(f"imageio: {imageio.__version__}")
+print(f"matplotlib: {matplotlib.__version__}")
+print(f"numpy: {numpy.__version__}")
+print(f"Pillow: {Pillow.__version__}")
+print(f"scipy: {scipy.__version__}")
+print(f"torch: {torch.__version__}")
+print(f"torchvision: {torchvision.__version__}")
