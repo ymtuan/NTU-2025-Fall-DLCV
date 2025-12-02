@@ -1,0 +1,26 @@
+#Ignore the dataset
+#IMPORTANT: make sure that your dataset is stored in a folder with the same as the one specified below
+
+
+*.png
+*.jpg
+*.jpeg
+*.pyc
+*.pyo
+*.bin
+
+*.tgz
+*.zip
+*.tar
+
+*.ckpt
+*.pth
+*.pt
+!Classifier.pth
+
+hw2_data/*
+checkpoints/*
+!checkpoints/.gitkeep
+
+src/taming-transformers/
+src/clip/
