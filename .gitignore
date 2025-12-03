@@ -57,10 +57,11 @@ data/
 *.zip
 *.png
 
+# DLCV_Final1 folder (excluded from repository)
+DLCV_Final1/
+
 # Large JSON data files (exceed GitHub 100MB limit)
-DLCV_Final1/train.json
-DLCV_Final1/test.json
-DLCV_Final1/val.json
+SpatialAgent/data/train/train.json
 SpatialAgent/data/train/train.json
 SpatialAgent/data/train/train_dist_est.json
 SpatialAgent/data/train/inside.json
