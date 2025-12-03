@@ -1,0 +1,86 @@
+You are given several functions that operate on mask objects (like pallets, buffers, transporters, and shelves). These functions include:
+
+CRITICAL: Each function has a STRICT argument count limit. You MUST provide EXACTLY the number of arguments specified. Do NOT add extra arguments.
+
+dist(mask_1, mask_2): Returns the distance between two masks.
+- Argument count: EXACTLY 2 arguments (mask_1, mask_2)
+- Example: dist(pallet_0, buffer_1)
+
+closest(mask_1, list_of_masks): Returns the ID of the closest mask to mask_1 among the provided masks.
+- Argument count: EXACTLY 2 arguments (mask_1, list_of_masks)
+- The second argument MUST be a list [mask_2, mask_3, ...], NOT individual masks
+- Example: closest(buffer_1, [pallet_0, pallet_1, shelf_3])
+- WRONG: closest(buffer_1, pallet_0, pallet_1, shelf_3)  ❌ Too many arguments!
+
+is_left(mask_1, mask_2): Returns True if mask_1 is to the left of mask_2.
+- Argument count: EXACTLY 2 arguments (mask_1, mask_2)
+- Example: is_left(transporter_0, pallet_2)
+
+is_right(mask_1, mask_2): Returns True if mask_1 is to the right of mask_2.
+- Argument count: EXACTLY 2 arguments (mask_1, mask_2)
+- Example: is_right(shelf_3, pallet_1)
+
+inside(mask_1, list_of_masks): Counts how many of the given masks are inside mask_1.
+- Argument count: EXACTLY 2 arguments (mask_1, list_of_masks)
+- The second argument MUST be a list [mask_2, mask_3, ...], NOT individual masks
+- Example: inside(buffer_1, [pallet_0, pallet_1, pallet_2])
+- WRONG: inside(buffer_1, pallet_0, pallet_1, pallet_2)  ❌ Too many arguments!
+
+most_right(list_of_masks): Returns the ID of the mask that is the rightmost among the given masks.
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Example: most_right([pallet_0, pallet_1, transporter_0, shelf_3])
+- WRONG: most_right(pallet_0, pallet_1, transporter_0, shelf_3)  ❌ Too many arguments!
+
+most_left(list_of_masks): Returns the ID of the mask that is the leftmost among the given masks.
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Example: most_left([pallet_0, pallet_1, transporter_0, shelf_3])
+- WRONG: most_left(pallet_0, pallet_1, transporter_0, shelf_3)  ❌ Too many arguments!
+
+middle(list_of_3_masks): Returns the ID of the mask that is in the middle of the three masks.
+- Argument count: EXACTLY 1 argument (a list of EXACTLY 3 masks)
+- The argument MUST be a list with EXACTLY 3 elements [mask_1, mask_2, mask_3]
+- Example: middle([pallet_0, pallet_1, transporter_0])
+- WRONG: middle(pallet_0, pallet_1, transporter_0)  ❌ Too many arguments!
+- WRONG: middle([pallet_0, pallet_1])  ❌ Too few masks in list!
+
+is_empty(list_of_masks): Returns a list of transporter IDs that are empty. Only provide transporter masks as input.
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Example: is_empty([transporter_0, transporter_1, transporter_2])
+- WRONG: is_empty(transporter_0, transporter_1, transporter_2)  ❌ Too many arguments!
+
+<question>  
+Solve this question and answer with the following format:  
+<reasoning>  
+put your reasoning here  
+</reasoning>  
+then, choose one action between <execute> and <answer>  
+<execute>  
+Use one function here, I will return the results for you. After you receive the output from me, continue to the next iteration. Always start with the provided function name!
+IMPORTANT: Always write a complete function call inside the execute tags with EXACTLY the correct number of arguments as specified above.
+- Functions that require a list must receive ONE list argument: [mask1, mask2, ...]
+- Do NOT pass multiple individual arguments when a list is required
+For example:
+<execute>most_right([buffer_0, buffer_1])</execute>
+<execute>inside(buffer_1, [pallet_0, pallet_1, pallet_2])</execute>
+<execute>dist(pallet_0, buffer_1)</execute>
+</execute>  
+or
+<answer>  
+only output the answer when you got the final answer.  
+</answer>
+
+IMPORTANT: After receiving a tool result, if you determine that the tool result is the final answer to the question, you can mark it by outputting <final> tag. For example:
+Tool result: True
+<final>
+This indicates that the tool result (True) should be used as the final answer. For direction questions (is_left/is_right), the boolean result will be automatically converted to "left" or "right" direction string.  
+
+Several important rules when solving the question:  
+- CRITICAL: Always provide EXACTLY the number of arguments specified for each function. Functions that take a list must receive a SINGLE list argument, not multiple individual arguments.
+- When asked to select or retrieve an object, please consider the distance.  
+- Do not make any assumptions on objects' left/middle/right relationship based on their ID number—use the provided function to determine their left/middle/right position.  
+- If you need to calculate multiple object distances, consider using the closest function.
+- IMPORTANT: Always trust the function results. The functions analyze the actual spatial positions of objects in the image, not their names or IDs.
+- When you receive a function result, use that exact result as your final answer without second-guessing or "correcting" it.

@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Model files
+*.pth
+*.ckpt
+*.pt
+*.h5
+*.pb
+
+# Output files
+output/
+*.log
+*.out
+
+# Credentials and secrets
+*credentials*.json
+*service_account*.json
+gen-lang-client-*.json
+*.key
+*.pem
+
+# Data files (uncomment if you don't want to commit large data files)
+data/
+*.tar.gz
+*.zip
+*.png
+
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Git LFS attributes (to avoid git-lfs dependency)
+.gitattributes
+
