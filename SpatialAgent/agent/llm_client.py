@@ -6,12 +6,14 @@ LLM Client 抽象層
 from abc import ABC, abstractmethod
 from typing import List, Dict, Optional
 import os
+import base64
 
 class LLMClient(ABC):
     """LLM 客戶端抽象基類"""
     
     def __init__(self):
         self.messages = []  # 對話歷史
+        self.is_vision_model = False  # 是否為視覺模型
     
     @abstractmethod
     def send_message(self, message: str) -> str:
@@ -57,16 +59,17 @@ class OpenAIAPIClient(LLMClient):
     """OpenAI API 兼容客戶端（支援 vLLM）"""
     
     def __init__(self, api_base: str = None, api_key: str = "dummy", model: str = None, 
-                 temperature: float = 0.2, max_tokens: int = 2048):
+                 temperature: float = 0.2, max_tokens: int = 2048, is_vision_model: bool = False):
         """
         初始化 OpenAI API 客戶端
         
         Args:
-            api_base: API 基礎 URL (例如: http://localhost:8040/v1)
-            api_key: API 密鑰 (vLLM 可以使用任意值)
+            api_base: API 基礎 URL
+            api_key: API 密鑰
             model: 模型名稱
             temperature: 溫度參數
             max_tokens: 最大 token 數
+            is_vision_model: 是否為視覺語言模型（如 Qwen2-VL）
         """
         super().__init__()
         try:
@@ -81,21 +84,73 @@ class OpenAIAPIClient(LLMClient):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.is_vision_model = is_vision_model
+        self.current_image_path = None
     
-    def send_message(self, message: str) -> str:
-        """發送訊息到 OpenAI API"""
-        self.messages.append({"role": "user", "content": message})
+    def update_image(self, image_path: str):
+        """更新圖片路徑（僅視覺模型需要）"""
+        if self.is_vision_model:
+            self.current_image_path = image_path
+    
+    def _encode_image_to_base64(self, image_path: str) -> str:
+        """將圖片編碼為 base64 字符串"""
+        with open(image_path, "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode('utf-8')
+    
+    def send_message(self, message: str, is_classification: bool = False) -> str:
+        """發送訊息到 OpenAI API
         
+        Args:
+            message: 訊息內容
+            is_classification: 是否為分類請求（總是純文本）
+        """
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=self.messages,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
-            response_text = response.choices[0].message.content.strip()
-            self.messages.append({"role": "assistant", "content": response_text})
-            return response_text
+            if is_classification or not self.is_vision_model:
+                # 純文本請求（分類或文本模型）
+                self.messages.append({"role": "user", "content": message})
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=self.messages if not is_classification else [{"role": "user", "content": message}],
+                    temperature=0.0 if is_classification else self.temperature,
+                    max_tokens=20 if is_classification else self.max_tokens
+                )
+                response_text = response.choices[0].message.content.strip()
+                
+                if not is_classification:
+                    self.messages.append({"role": "assistant", "content": response_text})
+                
+                return response_text
+            else:
+                # 視覺語言模型請求
+                self.messages.append({"role": "user", "content": message})
+                
+                if not self.current_image_path:
+                    raise ValueError("Vision model requires image. Call update_image() first.")
+                
+                base64_image = self._encode_image_to_base64(self.current_image_path)
+                
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "image_url",
+                                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                                },
+                                {"type": "text", "text": message}
+                            ]
+                        }
+                    ],
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                )
+                
+                response_text = response.choices[0].message.content.strip()
+                self.messages.append({"role": "assistant", "content": response_text})
+                return response_text
+                
         except Exception as e:
             raise RuntimeError(f"OpenAI API 錯誤: {e}")
 
@@ -144,7 +199,7 @@ def create_llm_client(client_type: str = "gemini", **kwargs) -> LLMClient:
         client_type: "gemini", "openai" (vLLM), 或 "local"
         **kwargs: 客戶端特定參數
             - Gemini: project_id, location, think_mode
-            - OpenAI/vLLM: api_base, api_key, model, temperature, max_tokens
+            - OpenAI/vLLM: api_base, api_key, model, temperature, max_tokens, is_vision_model
             - Local: model_path, model_name
     
     Returns:
