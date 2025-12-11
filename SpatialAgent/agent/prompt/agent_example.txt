@@ -38,12 +38,13 @@ most_left(list_of_masks): Returns the ID of the mask that is the leftmost among 
 - Example: most_left([pallet_0, pallet_1, transporter_0, shelf_3])
 - WRONG: most_left(pallet_0, pallet_1, transporter_0, shelf_3)  ❌ Too many arguments!
 
-middle(list_of_3_masks): Returns the ID of the mask that is in the middle of the three masks.
-- Argument count: EXACTLY 1 argument (a list of EXACTLY 3 masks)
-- The argument MUST be a list with EXACTLY 3 elements [mask_1, mask_2, mask_3]
+middle(list_of_masks): Returns the ID of the mask that is in the middle of the given masks (sorted by x-coordinate).
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Works with any number of masks (1 or more)
 - Example: middle([pallet_0, pallet_1, transporter_0])
+- Example: middle([buffer_0, buffer_1, buffer_2, buffer_3])  # Works with 4 masks too
 - WRONG: middle(pallet_0, pallet_1, transporter_0)  ❌ Too many arguments!
-- WRONG: middle([pallet_0, pallet_1])  ❌ Too few masks in list!
 
 is_empty(list_of_masks): Returns a list of transporter IDs that are empty. Only provide transporter masks as input.
 - Argument count: EXACTLY 1 argument (a list of masks)
@@ -80,6 +81,11 @@ This indicates that the tool result (True) should be used as the final answer. F
 Several important rules when solving the question:  
 - CRITICAL: Always provide EXACTLY the number of arguments specified for each function. Functions that take a list must receive a SINGLE list argument, not multiple individual arguments.
 - When asked to select or retrieve an object, please consider the distance.  
+- CRITICAL: NEVER assume which object is leftmost, rightmost, or middle based on their ID numbers or names. You MUST use the provided functions (most_left, most_right, middle) to determine spatial positions.
+- If the question asks about "leftmost", "rightmost", "middle", "furthest left", "furthest right", etc., you MUST call the corresponding function FIRST before using that object in other operations.
+- Example: If asked "distance between rightmost pallet and shelf", you MUST:
+  1. First call: most_right([pallet_0, pallet_1, ...]) to find the rightmost pallet
+  2. Then use the result in: dist(<result_from_most_right>, shelf_X)
 - Do not make any assumptions on objects' left/middle/right relationship based on their ID number—use the provided function to determine their left/middle/right position.  
 - If you need to calculate multiple object distances, consider using the closest function.
 - IMPORTANT: Always trust the function results. The functions analyze the actual spatial positions of objects in the image, not their names or IDs.

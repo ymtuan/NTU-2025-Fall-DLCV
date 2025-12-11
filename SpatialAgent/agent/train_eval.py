@@ -22,7 +22,7 @@ class Agent:
         self.tools_api = tools_api
         self.verbose = verbose
         self.step_log = []  # 記錄每個步驟
-        self.som_visualizer = som_visualizer
+        # self.som_visualizer = som_visualizer  # 已註解：SoM 功能暫時不使用
         self.output_dir = output_dir
         
         self.messages = []
@@ -31,42 +31,13 @@ class Agent:
         self.input = input_item
         self.masks = None
         self.question = None
-        self.som_image_path = None  # SoM 處理後的圖像路徑
+        # self.som_image_path = None  # 已註解：SoM 功能暫時不使用
         self.original_image_path = None  # 原始圖像路徑
         self.question_category = None  # 問題類別
         self._category_cache = {}  # 快取 LLM 分類結果
         self.force_llm_category = force_llm_category  # 強制使用 LLM 分類
         self.predicted_category = None  # LLM 預測的類別（用於評估）
         self.ground_truth_category = None  # 數據集提供的真實類別（用於準確率計算）
-
-    def _detect_question_category(self, question):
-        """根據問題內容檢測問題類別"""
-        question_lower = question.lower()
-        
-        # 檢查的順序很重要！優先檢查更具體的類別
-        
-        # count 問題：計數相關（優先檢查，因為可能包含 left/right）
-        if any(keyword in question_lower for keyword in ['how many', 'count', 'number', 'total', 'many']):
-            return 'count'
-        
-        # distance 問題：距離相關（優先於 left_right）
-        if any(keyword in question_lower for keyword in ['distance', 'far', 'close', 'how far', 'meters', 'units', 'between']):
-            return 'distance'
-        
-        # left_right 問題：問左右方向
-        # 但要排除包含方向修飾詞的計數問題（如 "rightmost buffer region"）
-        if any(keyword in question_lower for keyword in ['left', 'right', 'which side', 'which direction']):
-            # 確保不是計數問題
-            if not any(keyword in question_lower for keyword in ['how many', 'count', 'number', 'total', 'many']):
-                return 'left_right'
-        
-        # mcq 問題：選擇題（which, what 但不是 left/right）
-        if any(keyword in question_lower for keyword in ['which', 'what']):
-            # 排除已經判斷為其他類別的情況
-            if not any(keyword in question_lower for keyword in ['how many', 'count', 'number', 'total', 'many', 'distance', 'far', 'close']):
-                return 'mcq'
-        
-        return 'other'
     
     def _detect_question_category_with_llm(self, question):
         """使用 LLM 檢測問題類別（僅 4 種類別）"""
@@ -203,220 +174,42 @@ Category:"""
                 'resolved_path': self.original_image_path
             })
             raise FileNotFoundError(f"Image not found: {self.original_image_path}")
-        # 如果有 SoM 可視化器，生成 SoM 圖像
-        if self.som_visualizer:
-            self._generate_som_image()
+        # 已註解：SoM 功能暫時不使用
+        # # 如果有 SoM 可視化器，生成 SoM 圖像
+        # if self.som_visualizer:
+        #     self._generate_som_image()
     
-    def _generate_som_image(self):
-        """生成 SoM 可視化圖像"""
-        try:
-            import os
-            if not os.path.exists(self.original_image_path):
-                self._log_step('som_image_skipped_missing_image', {
-                    'image_path': self.original_image_path
-                })
-                self.som_image_path = None
-                return
-            som_dir = os.path.join(self.output_dir, 'som_images')
-            os.makedirs(som_dir, exist_ok=True)
-            
-            self.som_image_path = os.path.join(som_dir, f"som_{self.input['id']}.png")
-            
-            self.som_visualizer.create_som_visualization(
-                image_path=self.original_image_path,
-                masks=self.masks,
-                output_path=self.som_image_path,
-                numbering_scheme="region_id"
-            )
-            
-            self._log_step('som_image_generated', {
-                'som_image_path': self.som_image_path
-            })
-            
-        except Exception as e:
-            if self.verbose:
-                print(f"SoM 圖像生成失敗: {e}")
-            self.som_image_path = self.original_image_path
-    
-    def _preprocess_question(self, question):
-        """預處理問題，將 <mask> 替換為具體的物件代碼"""
-        import re
-        
-        # 找到所有 <mask> 標記
-        mask_pattern = re.compile(r'<mask>')
-        mask_positions = list(mask_pattern.finditer(question))
-        
-        if not mask_positions:
-            return question
-        
-        # 按 region_id 排序的 masks
-        sorted_masks = sorted(self.masks.items(), key=lambda x: x[1].region_id)
-        
-        # 從後往前替換，避免位置偏移
-        processed_question = question
-        for i, match in enumerate(reversed(mask_positions)):
-            if i < len(sorted_masks):
-                mask_name, mask_obj = sorted_masks[len(mask_positions) - 1 - i]
-                replacement = f"{mask_obj.object_class}_{mask_obj.object_id}"
-                start, end = match.span()
-                processed_question = processed_question[:start] + replacement + processed_question[end:]
-        
-        self._log_step('question_preprocessed', {
-            'original': question,
-            'processed': processed_question
-        })
-        
-        return processed_question
-    
-    def _is_final_tool_result(self, command, result):
-        """判斷工具結果是否可以直接作為最終答案"""
-        # 解析函數名
-        import re
-        func_match = re.match(r"(\w+)\s*\(", command.strip())
-        if not func_match:
-            return False
-        
-        func_name = func_match.group(1)
-        
-        # 檢查問題類型來決定是否是最終答案
-        question = self.question.lower()
-        
-        # 如果問題問的是數量/計數，mask名稱通常不是最終答案
-        if any(keyword in question for keyword in ['number', 'count', 'how many', 'total']):
-            # 只有數值型結果才可能是最終答案
-            try:
-                float(str(result))
-                return func_name in ['dist', 'inside']  # 只有這些函數返回數值
-            except:
-                return False
-        
-        # 如果問題問的是"which"、"what"且期望物件名稱，則可以直接返回
-        if any(keyword in question for keyword in ['which', 'what']) and not any(keyword in question for keyword in ['number', 'count', 'many']):
-            return func_name in ['closest', 'most_right', 'most_left', 'middle', 'is_empty']
-        
-        # 距離查詢總是可以直接返回數值結果
-        if func_name == 'dist':
-            return True
-        
-        # 方向查詢（is_left/is_right）需要特殊處理
-        if func_name in ['is_left', 'is_right']:
-            # 檢查是否是問方向的問題
-            if any(keyword in question for keyword in ['left', 'right', 'side', 'which']):
-                return True
-            
-        return False
-    
-    def _is_direction_question(self, command, result):
-        """檢查是否是方向問題"""
-        import re
-        func_match = re.match(r"(\w+)\s*\(", command.strip())
-        if not func_match:
-            return False
-        
-        func_name = func_match.group(1)
-        return func_name in ['is_left', 'is_right'] and isinstance(result, bool)
-    
-    def _convert_boolean_to_direction(self, command, boolean_result, reference_question=None):
-        """將 Boolean 結果轉換為方向字符串
-        
-        Args:
-            command: 執行的命令
-            boolean_result: Boolean 結果
-            reference_question: 參考問題文本，用於額外的上下文判斷
-        """
-        import re
-        func_match = re.match(r"(\w+)\s*\(", command.strip())
-        if not func_match:
-            return str(boolean_result)
-        
-        func_name = func_match.group(1)
-        
-        if func_name == 'is_left':
-            result = 'left' if boolean_result else 'right'
-        elif func_name == 'is_right':
-            result = 'right' if boolean_result else 'left'
-        else:
-            result = str(boolean_result)
-        
-        self._log_step('boolean_to_direction_converted', {
-            'function': func_name,
-            'boolean_result': boolean_result,
-            'direction_result': result,
-            'reference_question': reference_question
-        })
-        return result
-    
-    def set_masks(self):
-        # Train set 格式：conversations[0]['value'] 是問題
-        conversation = self.input['conversations'][0]['value']
-        rle_data = self.input['rle']
-        
-        self._log_step('set_masks_start', {
-            'item_id': self.input.get('id', 'unknown'),
-            'conversation_length': len(conversation),
-            'rle_count': len(rle_data),
-            'conversation_preview': conversation
-        })
-        
-        self.masks = parse_masks_from_conversation(conversation, rle_data)
-        
-        self._log_step('set_masks_complete', {
-            'masks_found': len(self.masks),
-            'mask_keys': list(self.masks.keys()),
-            'masks_detail': {k: str(v) for k, v in list(self.masks.items())[:5]}
-        })
-        
-        self.tools_api.update_masks(self.masks)
-        if not self.masks:
-            raise ValueError("No valid masks found in the conversation.")
-        
-        # 設置原始圖像路徑（根據數據集動態設置）
-        # 從 input_item 中獲取圖像路徑，如果沒有則使用默認路徑
-        if 'image_dir' in self.input:
-            self.original_image_path = os.path.join(self.input['image_dir'], self.input['image'])
-        else:
-            default_image_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1/train/images'
-            self.original_image_path = os.path.join(default_image_dir, self.input['image'])
-        
-        if not os.path.exists(self.original_image_path):
-            self._log_step('image_path_not_found', {
-                'resolved_path': self.original_image_path
-            })
-            raise FileNotFoundError(f"Image not found: {self.original_image_path}")
-        # 如果有 SoM 可視化器，生成 SoM 圖像
-        if self.som_visualizer:
-            self._generate_som_image()
-    
-    def _generate_som_image(self):
-        """生成 SoM 可視化圖像"""
-        try:
-            import os
-            if not os.path.exists(self.original_image_path):
-                self._log_step('som_image_skipped_missing_image', {
-                    'image_path': self.original_image_path
-                })
-                self.som_image_path = None
-                return
-            som_dir = os.path.join(self.output_dir, 'som_images')
-            os.makedirs(som_dir, exist_ok=True)
-            
-            self.som_image_path = os.path.join(som_dir, f"som_{self.input['id']}.png")
-            
-            self.som_visualizer.create_som_visualization(
-                image_path=self.original_image_path,
-                masks=self.masks,
-                output_path=self.som_image_path,
-                numbering_scheme="region_id"
-            )
-            
-            self._log_step('som_image_generated', {
-                'som_image_path': self.som_image_path
-            })
-            
-        except Exception as e:
-            if self.verbose:
-                print(f"SoM 圖像生成失敗: {e}")
-            self.som_image_path = self.original_image_path
+    # 已註解：SoM 功能暫時不使用
+    # def _generate_som_image(self):
+    #     """生成 SoM 可視化圖像"""
+    #     try:
+    #         import os
+    #         if not os.path.exists(self.original_image_path):
+    #             self._log_step('som_image_skipped_missing_image', {
+    #                 'image_path': self.original_image_path
+    #             })
+    #             self.som_image_path = None
+    #             return
+    #         som_dir = os.path.join(self.output_dir, 'som_images')
+    #         os.makedirs(som_dir, exist_ok=True)
+    #         
+    #         self.som_image_path = os.path.join(som_dir, f"som_{self.input['id']}.png")
+    #         
+    #         self.som_visualizer.create_som_visualization(
+    #             image_path=self.original_image_path,
+    #             masks=self.masks,
+    #             output_path=self.som_image_path,
+    #             numbering_scheme="region_id"
+    #         )
+    #         
+    #         self._log_step('som_image_generated', {
+    #             'som_image_path': self.som_image_path
+    #         })
+    #         
+    #     except Exception as e:
+    #         if self.verbose:
+    #             print(f"SoM 圖像生成失敗: {e}")
+    #         self.som_image_path = self.original_image_path
     
     def _preprocess_question(self, question):
         """預處理問題，將 <mask> 替換為具體的物件代碼"""
@@ -486,16 +279,6 @@ Category:"""
             
         return False
     
-    def _is_direction_question(self, command, result):
-        """檢查是否是方向問題"""
-        import re
-        func_match = re.match(r"(\w+)\s*\(", command.strip())
-        if not func_match:
-            return False
-        
-        func_name = func_match.group(1)
-        return func_name in ['is_left', 'is_right'] and isinstance(result, bool)
-    
     def _convert_boolean_to_direction(self, command, boolean_result, reference_question=None):
         """將 Boolean 結果轉換為方向字符串
         
@@ -526,146 +309,6 @@ Category:"""
         })
         return result
     
-    def set_masks(self):
-        # Train set 格式：conversations[0]['value'] 是問題
-        conversation = self.input['conversations'][0]['value']
-        rle_data = self.input['rle']
-        
-        self._log_step('set_masks_start', {
-            'item_id': self.input.get('id', 'unknown'),
-            'conversation_length': len(conversation),
-            'rle_count': len(rle_data),
-            'conversation_preview': conversation
-        })
-        
-        self.masks = parse_masks_from_conversation(conversation, rle_data)
-        
-        self._log_step('set_masks_complete', {
-            'masks_found': len(self.masks),
-            'mask_keys': list(self.masks.keys()),
-            'masks_detail': {k: str(v) for k, v in list(self.masks.items())[:5]}
-        })
-        
-        self.tools_api.update_masks(self.masks)
-        if not self.masks:
-            raise ValueError("No valid masks found in the conversation.")
-        
-        # 設置原始圖像路徑（根據數據集動態設置）
-        # 從 input_item 中獲取圖像路徑，如果沒有則使用默認路徑
-        if 'image_dir' in self.input:
-            self.original_image_path = os.path.join(self.input['image_dir'], self.input['image'])
-        else:
-            default_image_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1/train/images'
-            self.original_image_path = os.path.join(default_image_dir, self.input['image'])
-        
-        if not os.path.exists(self.original_image_path):
-            self._log_step('image_path_not_found', {
-                'resolved_path': self.original_image_path
-            })
-            raise FileNotFoundError(f"Image not found: {self.original_image_path}")
-        # 如果有 SoM 可視化器，生成 SoM 圖像
-        if self.som_visualizer:
-            self._generate_som_image()
-    
-    def _generate_som_image(self):
-        """生成 SoM 可視化圖像"""
-        try:
-            import os
-            if not os.path.exists(self.original_image_path):
-                self._log_step('som_image_skipped_missing_image', {
-                    'image_path': self.original_image_path
-                })
-                self.som_image_path = None
-                return
-            som_dir = os.path.join(self.output_dir, 'som_images')
-            os.makedirs(som_dir, exist_ok=True)
-            
-            self.som_image_path = os.path.join(som_dir, f"som_{self.input['id']}.png")
-            
-            self.som_visualizer.create_som_visualization(
-                image_path=self.original_image_path,
-                masks=self.masks,
-                output_path=self.som_image_path,
-                numbering_scheme="region_id"
-            )
-            
-            self._log_step('som_image_generated', {
-                'som_image_path': self.som_image_path
-            })
-            
-        except Exception as e:
-            if self.verbose:
-                print(f"SoM 圖像生成失敗: {e}")
-            self.som_image_path = self.original_image_path
-    
-    def _preprocess_question(self, question):
-        """預處理問題，將 <mask> 替換為具體的物件代碼"""
-        import re
-        
-        # 找到所有 <mask> 標記
-        mask_pattern = re.compile(r'<mask>')
-        mask_positions = list(mask_pattern.finditer(question))
-        
-        if not mask_positions:
-            return question
-        
-        # 按 region_id 排序的 masks
-        sorted_masks = sorted(self.masks.items(), key=lambda x: x[1].region_id)
-        
-        # 從後往前替換，避免位置偏移
-        processed_question = question
-        for i, match in enumerate(reversed(mask_positions)):
-            if i < len(sorted_masks):
-                mask_name, mask_obj = sorted_masks[len(mask_positions) - 1 - i]
-                replacement = f"{mask_obj.object_class}_{mask_obj.object_id}"
-                start, end = match.span()
-                processed_question = processed_question[:start] + replacement + processed_question[end:]
-        
-        self._log_step('question_preprocessed', {
-            'original': question,
-            'processed': processed_question
-        })
-        
-        return processed_question
-    
-    def _is_final_tool_result(self, command, result):
-        """判斷工具結果是否可以直接作為最終答案"""
-        # 解析函數名
-        import re
-        func_match = re.match(r"(\w+)\s*\(", command.strip())
-        if not func_match:
-            return False
-        
-        func_name = func_match.group(1)
-        
-        # 檢查問題類型來決定是否是最終答案
-        question = self.question.lower()
-        
-        # 如果問題問的是數量/計數，mask名稱通常不是最終答案
-        if any(keyword in question for keyword in ['number', 'count', 'how many', 'total']):
-            # 只有數值型結果才可能是最終答案
-            try:
-                float(str(result))
-                return func_name in ['dist', 'inside']  # 只有這些函數返回數值
-            except:
-                return False
-        
-        # 如果問題問的是"which"、"what"且期望物件名稱，則可以直接返回
-        if any(keyword in question for keyword in ['which', 'what']) and not any(keyword in question for keyword in ['number', 'count', 'many']):
-            return func_name in ['closest', 'most_right', 'most_left', 'middle', 'is_empty']
-        
-        # 距離查詢總是可以直接返回數值結果
-        if func_name == 'dist':
-            return True
-        
-        # 方向查詢（is_left/is_right）需要特殊處理
-        if func_name in ['is_left', 'is_right']:
-            # 檢查是否是問方向的問題
-            if any(keyword in question for keyword in ['left', 'right', 'side', 'which']):
-                return True
-            
-        return False
-    
     def _is_direction_question(self, command, result):
         """檢查是否是方向問題"""
         import re
@@ -675,36 +318,6 @@ Category:"""
         
         func_name = func_match.group(1)
         return func_name in ['is_left', 'is_right'] and isinstance(result, bool)
-    
-    def _convert_boolean_to_direction(self, command, boolean_result, reference_question=None):
-        """將 Boolean 結果轉換為方向字符串
-        
-        Args:
-            command: 執行的命令
-            boolean_result: Boolean 結果
-            reference_question: 參考問題文本，用於額外的上下文判斷
-        """
-        import re
-        func_match = re.match(r"(\w+)\s*\(", command.strip())
-        if not func_match:
-            return str(boolean_result)
-        
-        func_name = func_match.group(1)
-        
-        if func_name == 'is_left':
-            result = 'left' if boolean_result else 'right'
-        elif func_name == 'is_right':
-            result = 'right' if boolean_result else 'left'
-        else:
-            result = str(boolean_result)
-        
-        self._log_step('boolean_to_direction_converted', {
-            'function': func_name,
-            'boolean_result': boolean_result,
-            'direction_result': result,
-            'reference_question': reference_question
-        })
-        return result
     
     def format_answer(self, raw_answer=None):
         """格式化答案，可以接受來自 conversation_loop 的答案或重新查詢 LLM"""
@@ -749,23 +362,51 @@ Category:"""
         
         # 如果答案是 mask 名稱，需要根據問題類型決定如何處理
         if formatted_answer in self.masks:
+            mask_obj = self.masks[formatted_answer]
             # 檢查原問題來決定返回格式
             original_question = self.input['conversations'][0]['value'].lower()
             
+            # 檢查標準答案格式，如果標準答案是 Region ID，則返回 Region ID
+            gt_answer = self.input.get('normalized_answer', '')
+            if gt_answer and gt_answer.isdigit():
+                # 標準答案是數字，可能是 Region ID 或 object_id
+                # 檢查標準答案是否匹配 Region ID
+                if str(mask_obj.region_id) == gt_answer:
+                    # 標準答案匹配 Region ID，返回 Region ID
+                    result = str(mask_obj.region_id)
+                    self._log_step('format_answer_mapped_to_region_id', {
+                        'original': formatted_answer,
+                        'mapped_to': result,
+                        'reason': 'GT answer matches region_id, returning region_id'
+                    })
+                    return result
+                elif str(mask_obj.object_id) == gt_answer:
+                    # 標準答案匹配 object_id，返回 object_id
+                    result = str(mask_obj.object_id)
+                    self._log_step('format_answer_mapped_to_object_id', {
+                        'original': formatted_answer,
+                        'mapped_to': result,
+                        'reason': 'GT answer matches object_id, returning object_id'
+                    })
+                    return result
+            
+            # 如果無法從 GT 判斷，使用原有邏輯
             if any(word in original_question for word in ['which', 'what', 'who']):
-                # 對於 "which" 類型問題，返回 object_id
-                result = self.masks[formatted_answer].object_id
-                self._log_step('format_answer_mapped_to_object_id', {
+                # 對於 "which" 類型問題，優先返回 Region ID（與數據集格式一致）
+                # 但如果問題明確提到 object_id，則返回 object_id
+                result = str(mask_obj.region_id)
+                self._log_step('format_answer_mapped_to_region_id', {
                     'original': formatted_answer,
                     'mapped_to': result,
-                    'reason': 'Which-type question, using object_id'
+                    'reason': 'Which-type question, using region_id to match dataset format'
                 })
             else:
-                # 對於其他問題，保持原 mask 名稱
-                result = formatted_answer
-                self._log_step('format_answer_kept_mask_name', {
-                    'answer': result,
-                    'reason': 'Non-which question, keeping mask name'
+                # 對於其他問題，返回 Region ID
+                result = str(mask_obj.region_id)
+                self._log_step('format_answer_mapped_to_region_id', {
+                    'original': formatted_answer,
+                    'mapped_to': result,
+                    'reason': 'Non-which question, using region_id'
                 })
             
             return result
@@ -861,8 +502,32 @@ Category:"""
         
         # MCQ 問題：尋找物件名稱或 object_id
         if category == 'mcq':
-            # 優先尋找 mask 名稱（buffer_, pallet_, transporter_）
-            mask_match = re.search(r'\b(buffer_\d+|pallet_\d+|transporter_\d+|object_\d+)\b', answer_text)
+            # 優先尋找 "Region X" 格式（這是數據集中使用的格式）
+            region_pattern = r'\[Region\s+(\d+)\]'
+            region_matches = re.findall(region_pattern, answer_text, re.IGNORECASE)
+            if region_matches:
+                # 找到最後一個提到的 Region（通常是答案）
+                region_id = int(region_matches[-1])
+                # 建立 region_id 到 mask 的映射
+                region_to_mask = {mask_obj.region_id: mask_name 
+                                 for mask_name, mask_obj in self.masks.items()}
+                
+                if region_id in region_to_mask:
+                    mask_name = region_to_mask[region_id]
+                    mask_obj = self.masks[mask_name]
+                    # 返回 Region ID（與標準答案格式一致）
+                    result = str(region_id)
+                    self._log_step('extract_final_answer_mcq_region', {
+                        'region_id': region_id,
+                        'mask_name': mask_name,
+                        'object_id': mask_obj.object_id,
+                        'result': result,
+                        'reason': 'Found Region X format, returning region_id to match normalized_answer format'
+                    })
+                    return result
+            
+            # 優先尋找 mask 名稱（buffer_, pallet_, transporter_, shelf_）
+            mask_match = re.search(r'\b(buffer_\d+|pallet_\d+|transporter_\d+|shelf_\d+|object_\d+)\b', answer_text)
             if mask_match:
                 result = mask_match.group(1)
                 self._log_step('extract_final_answer_mcq_mask', {
@@ -870,7 +535,7 @@ Category:"""
                 })
                 return result
             
-            # 尋找單獨的數字（可能是 object_id）
+            # 尋找單獨的數字（可能是 object_id 或 region_id）
             numbers = re.findall(r'\b(\d+)\b', answer_text)
             if numbers:
                 result = numbers[-1]
@@ -899,7 +564,7 @@ Category:"""
             return direction_match.group(1)
         
         # 尋找 mask 名稱
-        mask_match = re.search(r'\b(buffer_\d+|pallet_\d+|transporter_\d+|object_\d+)\b', answer_text)
+        mask_match = re.search(r'\b(buffer_\d+|pallet_\d+|transporter_\d+|shelf_\d+|object_\d+)\b', answer_text)
         if mask_match:
             return mask_match.group(1)
         
@@ -947,24 +612,13 @@ Category:"""
                     'source': 'dataset'
                 })
             else:
-                # 沒有 category 時，先嘗試關鍵字檢測
-                keyword_category = self._detect_question_category(self.question)
-                if keyword_category != 'other':
-                    self.question_category = keyword_category
-                    self.predicted_category = keyword_category
-                    self._log_step('category_from_keywords', {
-                        'category': self.question_category,
-                        'source': 'keywords'
-                    })
-                else:
-                    # 關鍵字檢測失敗，使用 LLM 分類
-                    self.question_category = self._detect_question_category_with_llm(self.question)
-                    self.predicted_category = self.question_category
-                    self._log_step('category_from_llm_fallback', {
-                        'category': self.question_category,
-                        'source': 'llm',
-                        'reason': 'keyword_detection_returned_other'
-                    })
+                self.question_category = self._detect_question_category_with_llm(self.question)
+                self.predicted_category = self.question_category
+                self._log_step('category_from_llm_fallback', {
+                    'category': self.question_category,
+                    'source': 'llm',
+                    'reason': 'keyword_detection_returned_other'
+                })
         
         self._log_step('set_question_start', {
             'original_question': original_question,
@@ -980,8 +634,9 @@ Category:"""
         available_masks = ", ".join(self.masks.keys())
         full_prompt += f"\n\nAvailable masks in this image: {available_masks}"
         
-        # 使用 SoM 圖像（如果有）或原始圖像給 VLM
-        image_for_vlm = self.som_image_path if self.som_image_path else self.original_image_path
+        # 使用原始圖像給 VLM（已註解 SoM 功能）
+        # image_for_vlm = self.som_image_path if self.som_image_path else self.original_image_path
+        image_for_vlm = self.original_image_path
         
         self._log_step('prompt_prepared', {
             'prompt_length': len(full_prompt),
@@ -1120,6 +775,58 @@ Category:"""
                         'command': command
                     })
                     
+                    # 檢測是否應該先調用空間函數但沒有調用
+                    question_lower = self.question.lower()
+                    reasoning_text = response_text.lower()
+                    
+                    # 檢查問題中是否提到 leftmost/rightmost/middle
+                    question_mentions_leftmost = any(kw in question_lower for kw in ['leftmost', 'most left', 'furthest left'])
+                    question_mentions_rightmost = any(kw in question_lower for kw in ['rightmost', 'most right', 'furthest right'])
+                    question_mentions_middle = 'middle' in question_lower
+                    
+                    # 檢查當前命令是否調用了空間函數
+                    command_calls_spatial = any(func in command for func in ['most_left', 'most_right', 'middle'])
+                    
+                    # 檢查對話歷史中是否已經調用過空間函數（避免誤判）
+                    # 檢查之前的工具結果，看是否已經找到過 leftmost/rightmost/middle
+                    has_called_spatial_before = False
+                    if last_tool_command:
+                        has_called_spatial_before = any(func in last_tool_command for func in ['most_left', 'most_right', 'middle'])
+                    
+                    # 檢查所有歷史消息，看是否調用過空間函數
+                    for msg in self.messages:
+                        if isinstance(msg, dict) and 'content' in msg:
+                            content = msg['content']
+                            if any(func in content for func in ['most_left', 'most_right', 'middle']):
+                                has_called_spatial_before = True
+                                break
+                    
+                    # 如果問題提到空間關係但命令沒有調用空間函數，且命令中使用了具體的 mask 名稱
+                    # 並且之前沒有調用過空間函數（避免誤判已經找到的結果）
+                    if (question_mentions_leftmost or question_mentions_rightmost or question_mentions_middle) and not command_calls_spatial and not has_called_spatial_before:
+                        # 檢查命令中是否直接使用了 mask 名稱（可能是假設的）
+                        mask_name_pattern = r'\b(pallet|buffer|transporter|shelf)_\d+'
+                        if re.search(mask_name_pattern, command):
+                            # 提醒 LLM 應該先調用空間函數
+                            if question_mentions_leftmost:
+                                self.messages.append({
+                                    "role": "user",
+                                    "content": "WARNING: The question asks about 'leftmost', but you're using a specific mask name directly. You MUST first call most_left([list_of_masks]) to find the leftmost object, then use that result in your next function call."
+                                })
+                                continue
+                            elif question_mentions_rightmost:
+                                self.messages.append({
+                                    "role": "user",
+                                    "content": "WARNING: The question asks about 'rightmost', but you're using a specific mask name directly. You MUST first call most_right([list_of_masks]) to find the rightmost object, then use that result in your next function call."
+                                })
+                                continue
+                            elif question_mentions_middle:
+                                self.messages.append({
+                                    "role": "user",
+                                    "content": "WARNING: The question asks about 'middle', but you're using a specific mask name directly. You MUST first call middle([list_of_masks]) to find the middle object, then use that result in your next function call."
+                                })
+                                continue
+                    
                     try:
                         result = self._execute_function(command)
                         
@@ -1181,11 +888,34 @@ Category:"""
                     'has_answer': answer_match is not None
                 })
                 
-                # 提示 LLM 提供有效的結構
-                self.messages.append({
-                    "role": "user",
-                    "content": "Please provide a clear response in one of these formats:\n1. <execute>function_name(args)</execute> to call a tool\n2. <answer>your_answer</answer> after using tools"
-                })
+                # 檢測是否在 reasoning 中提到了 leftmost/rightmost/middle 但沒有調用工具
+                reasoning_text = response_text.lower()
+                needs_spatial_tool = False
+                tool_suggestion = ""
+                
+                if any(keyword in reasoning_text for keyword in ['leftmost', 'rightmost', 'furthest left', 'furthest right', 'most left', 'most right']):
+                    if 'most_left' not in response_text and 'most_right' not in response_text:
+                        needs_spatial_tool = True
+                        if 'leftmost' in reasoning_text or 'most left' in reasoning_text or 'furthest left' in reasoning_text:
+                            tool_suggestion = "You mentioned 'leftmost' but didn't call most_left(). Please call most_left([list_of_masks]) first to find the leftmost object."
+                        else:
+                            tool_suggestion = "You mentioned 'rightmost' but didn't call most_right(). Please call most_right([list_of_masks]) first to find the rightmost object."
+                
+                if 'middle' in reasoning_text and 'middle(' not in response_text:
+                    needs_spatial_tool = True
+                    tool_suggestion = "You mentioned 'middle' but didn't call middle(). Please call middle([mask1, mask2, mask3]) to find the middle object."
+                
+                if needs_spatial_tool:
+                    self.messages.append({
+                        "role": "user",
+                        "content": f"IMPORTANT: {tool_suggestion} You MUST use the spatial functions (most_left, most_right, middle) to determine object positions. Do not assume based on ID numbers."
+                    })
+                else:
+                    # 提示 LLM 提供有效的結構
+                    self.messages.append({
+                        "role": "user",
+                        "content": "Please provide a clear response in one of these formats:\n1. <execute>function_name(args)</execute> to call a tool\n2. <answer>your_answer</answer> after using tools"
+                    })
                 
             except Exception as loop_exc:
                 self._log_step(f'iteration_{usage}_loop_error', {
@@ -1586,26 +1316,27 @@ def main():
     parser.add_argument('--project_id', type=str, help='Google Cloud Project ID (for Gemini)')
     parser.add_argument('--location', type=str, default='global', help='Location for Vertex AI')
     parser.add_argument('--think_mode', action='store_true', help='Enable think mode')
-    parser.add_argument('--limit', type=int, default=1000, help='Number of samples to process')
+    parser.add_argument('--limit', type=int, default=2000, help='Number of samples to process')
     parser.add_argument('--llm_type', type=str, default='vllm', 
-                       choices=['gemini', 'openai', 'vllm'], 
+                       choices=['gemini', 'vllm'], 
                        help='LLM type: gemini, openai (for vLLM), or vllm')
-    parser.add_argument('--api_base', type=str, default='http://localhost:8060/v1',
+    parser.add_argument('--api_base', type=str, default='http://localhost:8040/v1',
                        help='API base URL (for vLLM/OpenAI API)')
     parser.add_argument('--api_key', type=str, default='None',
                        help='API key (for vLLM, can be any value)')
-    parser.add_argument('--model_name', type=str, default='Qwen/Qwen2.5-VL-7B-Instruct',
+    parser.add_argument('--model_name', type=str, default='Qwen/Qwen3-4B-Instruct-2507',
                        help='Model name (for vLLM)')
     parser.add_argument('--temperature', type=float, default=0.2, help='Temperature')
     parser.add_argument('--max_tokens', type=int, default=2048, help='Max tokens')
     parser.add_argument('--output_dir', type=str, default='../output', help='Output directory')
     parser.add_argument('--verbose', action='store_true', help='Verbose logging')
     parser.add_argument('--save_steps', action='store_true', default=True, help='Save step-by-step logs')
-    parser.add_argument('--enable_som', action='store_true', default=True, help='Enable Set-of-Marks visualization')
-    parser.add_argument('--som_scheme', type=str, default='region_id', 
-                       choices=['region_id', 'object_id', 'sequential'],
-                       help='SoM numbering scheme')
-    parser.add_argument('--som_alpha', type=int, default=120, help='SoM mask transparency (0-255)')
+    # 已註解：SoM 功能暫時不使用
+    # parser.add_argument('--enable_som', action='store_true', default=True, help='Enable Set-of-Marks visualization')
+    # parser.add_argument('--som_scheme', type=str, default='region_id', 
+    #                    choices=['region_id', 'object_id', 'sequential'],
+    #                    help='SoM numbering scheme')
+    # parser.add_argument('--som_alpha', type=int, default=120, help='SoM mask transparency (0-255)')
     parser.add_argument('--force_llm_category', action='store_true', default=True, 
                        help='Force LLM-based category detection even if dataset provides categories')
     args = parser.parse_args()
@@ -1651,25 +1382,14 @@ def main():
         print(f"模型: {args.model_name}")
         print(f"模型類型: {'視覺語言模型' if is_vision else '純文本模型'}")
 
-    # elif args.llm_type == 'openai':
-    #     # For real OpenAI API
-    #     llm_client = create_llm_client(
-    #         client_type='openai',
-    #         api_base=args.api_base,
-    #         api_key=args.api_key,
-    #         model=args.model_name,
-    #         temperature=args.temperature,
-    #         max_tokens=args.max_tokens
-    #     )
-    #     print(f"使用 OpenAI API: {args.api_base}")
-    #     print(f"模型: {args.model_name}")
+
     else:
         raise ValueError(f"不支援的 LLM 類型: {args.llm_type}")
 
     
     # 根據選擇的數據集設置路徑
     dataset = args.dataset
-    base_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1/'
+    base_dir = '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/'
     if dataset == 'train':
         data_file = os.path.join(base_dir, 'train.json')
         image_dir = os.path.join(base_dir, 'train', 'images')
@@ -1711,16 +1431,18 @@ def main():
         cascade_dist_thres=300, clamp_distance_thres=25
     )
     
-    # 初始化 SoM 可視化器（如果啟用）
+    # 已註解：SoM 功能暫時不使用
+    # # 初始化 SoM 可視化器（如果啟用）
+    # som_visualizer = None
+    # if args.enable_som:
+    #     som_visualizer = SoMVisualizer(
+    #         font_size=25, 
+    #         mask_alpha=args.som_alpha
+    #     )
+    #     # 創建輸出目錄
+    #     os.makedirs(os.path.join(args.output_dir, 'som_visualizations'), exist_ok=True)
+    #     print(f"SoM 可視化已啟用，使用 {args.som_scheme} 編號方案")
     som_visualizer = None
-    if args.enable_som:
-        som_visualizer = SoMVisualizer(
-            font_size=25, 
-            mask_alpha=args.som_alpha
-        )
-        # 創建輸出目錄
-        os.makedirs(os.path.join(args.output_dir, 'som_visualizations'), exist_ok=True)
-        print(f"SoM 可視化已啟用，使用 {args.som_scheme} 編號方案")
     
     # 處理每個項目
     results = []
@@ -1770,7 +1492,7 @@ def main():
             agent = Agent(llm_client, tools, item, 
                          think_mode=args.think_mode, 
                          verbose=args.verbose,
-                         som_visualizer=som_visualizer,
+                         # som_visualizer=som_visualizer,  # 已註解：SoM 功能暫時不使用
                          output_dir=args.output_dir,
                          force_llm_category=args.force_llm_category)
             
@@ -1783,16 +1505,6 @@ def main():
                 formatted_answer = '-1'
                 error_msg = f"{type(agent_exc).__name__}: {str(agent_exc)}"
                 print(f"[ERROR] Item {item_id}: {error_msg}")
-                
-                self._log_step_standalone = {
-                    'step': 'agent_execution_error',
-                    'data': {
-                        'item_id': item_id,
-                        'error': error_msg,
-                        'error_type': type(agent_exc).__name__,
-                        'category': item.get('category', 'unknown')
-                    }
-                }
             
             # 如果有 ground truth，進行答案比較
             if has_ground_truth and ground_truth:

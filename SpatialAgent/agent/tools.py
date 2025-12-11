@@ -244,7 +244,11 @@ class tools_api:
         # return the mask that is in the middle of all masks
         if not masks:
             raise ValueError("No masks provided to find the middle mask.")
-        assert len(masks) == 3, "The middle function requires exactly 3 masks."
+        
+        if len(masks) == 1:
+            # 只有一個 mask，直接返回
+            return masks[0].mask_name()
+        
         centroids = []
         for m in masks:
             centroid_x, _ = self._centroid(m.decode_mask())
@@ -254,7 +258,9 @@ class tools_api:
         centroids.sort(key=lambda x: x[0])
 
         # Return the mask name of the middle one
-        middle_mask = centroids[1][1]
+        # 如果奇數個，返回中間的；如果偶數個，返回中間偏右的（索引 len//2）
+        middle_index = len(centroids) // 2
+        middle_mask = centroids[middle_index][1]
         return middle_mask.mask_name()
 
     def is_empty(self, transporter_masks: List[Mask]) -> str:
