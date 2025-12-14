@@ -346,6 +346,16 @@ Category:"""
         # 使用類別特定的答案提取
         formatted_answer = self._extract_final_answer(answer, category=self.question_category)
         
+        # 如果提取失敗（返回 None），說明 LLM 說無法計算
+        if formatted_answer is None:
+            self._log_step('format_answer_cannot_extract', {
+                'raw_answer': answer[:200],
+                'category': self.question_category,
+                'reason': 'LLM indicated cannot compute, returning error marker'
+            })
+            # 返回錯誤標記，表示需要多步驟計算
+            return "-1"  # 使用 -1 作為錯誤標記
+        
         self._log_step('format_answer_extracted', {
             'formatted_answer': formatted_answer,
             'category': self.question_category
@@ -581,6 +591,28 @@ Category:"""
             if filtered_numbers:
                 return filtered_numbers[-1]
         
+        # 檢測是否為"無法計算"類型的回答
+        cannot_compute_patterns = [
+            r'cannot.*comput',
+            r'cannot.*calculat',
+            r'unable.*comput',
+            r'unable.*calculat',
+            r'cannot.*one.*function',
+            r'need.*multiple.*step',
+            r'requires.*multiple.*function'
+        ]
+        
+        answer_lower = answer_text.lower()
+        for pattern in cannot_compute_patterns:
+            if re.search(pattern, answer_lower):
+                self._log_step('extract_final_answer_cannot_compute', {
+                    'answer_text': answer_text[:200],
+                    'pattern': pattern,
+                    'reason': 'LLM says cannot compute, this should trigger multi-step guidance'
+                })
+                # 返回特殊標記，讓 format_answer 知道需要處理
+                return None  # 返回 None 表示無法提取有效答案
+        
         # 如果都找不到，返回原答案
         return answer_text
 
@@ -713,7 +745,20 @@ Category:"""
                 self.messages = self.llm_client.messages.copy()
 
                 # 檢查是否有 <final> tag（LLM 標記工具結果為最終答案）
+                # 先嘗試匹配完整的 <final>...</final>
                 final_match = re.search(r"<final>(.*?)</final>", response_text, re.IGNORECASE | re.DOTALL)
+                
+                # 如果沒有完整標籤，嘗試匹配不完整的 <final>...（沒有閉合標籤）
+                if not final_match:
+                    incomplete_final_match = re.search(r"<final>\s*(\S+.*?)$", response_text, re.IGNORECASE | re.DOTALL)
+                    if incomplete_final_match:
+                        final_content = incomplete_final_match.group(1).strip()
+                        self._log_step('incomplete_final_tag_detected', {
+                            'final_content': final_content,
+                            'reason': 'LLM provided <final> without closing tag, extracted content anyway'
+                        })
+                        final_match = incomplete_final_match  # 使用這個匹配結果
+                
                 if final_match:
                     final_content = final_match.group(1).strip()
                     
@@ -863,6 +908,34 @@ Category:"""
                         
                 if answer_match and execute_flag:
                     final_answer = answer_match.group(1).strip()
+                    
+                    # 檢測是否為"無法計算"類型的回答
+                    cannot_compute_keywords = ['cannot', 'unable', 'need multiple', 'requires multiple', 'one function call']
+                    if any(keyword in final_answer.lower() for keyword in cannot_compute_keywords):
+                        self._log_step('final_answer_cannot_compute_detected', {
+                            'answer': final_answer,
+                            'reason': 'LLM says cannot compute, guiding to use multi-step approach'
+                        })
+                        # 引導 LLM 使用多步驟方法
+                        question_lower = self.question.lower()
+                        guidance_msg = "You can solve this in multiple steps! "
+                        
+                        if 'rightmost' in question_lower or 'most right' in question_lower:
+                            guidance_msg += "First, use most_right([list_of_objects]) to find the rightmost object. "
+                        if 'leftmost' in question_lower or 'most left' in question_lower:
+                            guidance_msg += "Use most_left([list_of_objects]) to find the leftmost object. "
+                        if 'distance' in question_lower:
+                            guidance_msg += "Then use dist(object1, object2) to calculate the distance. "
+                        if 'closest' in question_lower:
+                            guidance_msg += "Then use closest(object1, [list_of_objects]) to find the closest. "
+                        
+                        guidance_msg += "Please try again with multiple function calls."
+                        
+                        self.messages.append({
+                            "role": "user",
+                            "content": guidance_msg
+                        })
+                        continue
                     
                     self._log_step('final_answer_found', {
                         'answer': final_answer,
@@ -1424,7 +1497,13 @@ def main():
     # 初始化工具
     tools = tools_api(
         dist_model_cfg={'model_path': '../distance_est/ckpt/epoch_5_iter_6831.pth'},
-        inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
+        # inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
+        inside_model_cfg={
+        'model_path': '../inside_pred/ckpt_dual_stream/best_model.pth',  # ← 新模型路徑
+        'use_geometry': True,      # ← 啟用 geometric features
+        'input_channels': 5,       # RGB(3) + obj_mask(1) + buffer_mask(1)
+        'num_geo_features': 8      # IoU, area_ratios, center_coords, depth_diff
+        },
         small_dist_model_cfg={'model_path': '../distance_est/ckpt/3m_epoch6.pth'},
         resize=(360, 640),
         mask_IoU_thres=0.3, inside_thres=0.5,

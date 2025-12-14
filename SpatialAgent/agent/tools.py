@@ -19,6 +19,7 @@ class tools_api:
         self.model = build_dist_model(dist_model_cfg)
         self.inside_model = build_inside_model(inside_model_cfg)
         self.small_dist_model = build_dist_model(small_dist_model_cfg)
+        self.use_geometry = inside_model_cfg.get('use_geometry', False)
         self.resize = resize
         self.mask_IoU_thres = mask_IoU_thres
         self.inside_thres = inside_thres
@@ -26,6 +27,7 @@ class tools_api:
         self.clamp_distance_thres = clamp_distance_thres
         self.img_path = img_path
         self.masks = None
+        self.depth_path = None
     
     def update_masks(self, masks: List[Mask]):
         self.masks = masks
@@ -33,6 +35,9 @@ class tools_api:
     def update_image(self, img_path):
         self.img_path = img_path
         assert os.path.exists(self.img_path), f"Image path {self.img_path} does not exist."
+        if self.use_geometry:
+            depth_path = img_path.replace('.png', '_depth.png')
+            self.depth_path = depth_path if os.path.exists(depth_path) else None
 
     def dist(self, mask_1: Mask, mask_2: Mask) -> float:
 
@@ -63,12 +68,14 @@ class tools_api:
 
         with torch.no_grad():
             predicted_distance = self.model(input_tensor).item()
+            print(f"large scale Predicted distance: {predicted_distance}")
 
         if predicted_distance < self.cascade_dist_thres:
             with torch.no_grad():
                 predicted_distance = self.small_dist_model(input_tensor).item()
+                print(f"small scale Predicted distance: {predicted_distance}")
             if predicted_distance < self.clamp_distance_thres:
-                predicted_distance = 0.0
+                predicted_distance = None
 
         predicted_distance = predicted_distance / 100.0
 
@@ -179,7 +186,58 @@ class tools_api:
         iou = intersection / union if union > 0 else 0.0
         return iou
 
-    def inside(self, mask_A: Mask, masks: List[Mask]) -> int:
+    # def inside(self, mask_A: Mask, masks: List[Mask], debug=False) -> int:
+    #     rgb = Image.open(self.img_path).convert('RGB')
+    #     rgb = F.resize(rgb, self.resize)
+    #     rgb = np.array(rgb).astype(np.float32) / 255.0
+
+    #     # Decode and resize mask_A
+    #     maskA_array = mask_A.decode_mask()
+    #     maskA_img = Image.fromarray(maskA_array)
+    #     maskA_img = F.resize(maskA_img, self.resize, interpolation=Image.NEAREST)
+    #     maskA_resized = np.array(maskA_img).astype(np.float32)
+
+    #     batch_tensors = []
+    #     mask_names = []
+
+    #     for m in masks:
+    #         maskB_array = m.decode_mask()
+    #         maskB_img = Image.fromarray(maskB_array)
+    #         maskB_img = F.resize(maskB_img, self.resize, interpolation=Image.NEAREST)
+    #         maskB_resized = np.array(maskB_img).astype(np.float32)
+
+    #         # Stack RGB, maskA, maskB as channels (adapt as needed)
+    #         components = [rgb, maskA_resized[..., None], maskB_resized[..., None]]
+    #         input_tensor = np.concatenate(components, axis=-1)
+    #         input_tensor = torch.tensor(input_tensor).permute(2, 0, 1)
+    #         batch_tensors.append(input_tensor)
+    #         mask_names.append(m.mask_name())
+
+    #     batch_tensor = torch.stack(batch_tensors).to(DEVICE)
+
+    #     with torch.no_grad():
+    #         # Output: logits, convert to 0/1 using configurable threshold
+    #         logits = self.inside_model(batch_tensor)
+    #         preds = torch.sigmoid(logits).cpu().numpy()
+            
+    #         # Debug: print probability scores
+    #         if debug:
+    #             print(f"\n=== Inside Debug for {mask_A.mask_name()} ===")
+    #             for i, (name, prob) in enumerate(zip(mask_names, preds)):
+    #                 inside_label = "INSIDE" if prob >= self.inside_thres else "OUTSIDE"
+    #                 print(f"  {name}: prob={prob:.4f} ({inside_label})")
+    #             print(f"  Threshold: {self.inside_thres}")
+            
+    #         # Apply threshold
+    #         preds_binary = (preds >= self.inside_thres).astype(np.int32)
+
+    #     count = int(preds_binary.sum())
+        
+    #     if debug:
+    #         print(f"  Total count: {count}/{len(masks)}")
+        
+    #     return count
+    def inside(self, mask_A: Mask, masks: List[Mask], debug=False) -> int:
         rgb = Image.open(self.img_path).convert('RGB')
         rgb = F.resize(rgb, self.resize)
         rgb = np.array(rgb).astype(np.float32) / 255.0
@@ -190,7 +248,16 @@ class tools_api:
         maskA_img = F.resize(maskA_img, self.resize, interpolation=Image.NEAREST)
         maskA_resized = np.array(maskA_img).astype(np.float32)
 
+        # Optional: Load depth if using geometry
+        depth = None
+        if self.use_geometry and self.depth_path is not None and os.path.exists(self.depth_path):
+            depth = Image.open(self.depth_path)
+            depth = F.resize(depth, self.resize)
+            depth = np.array(depth).astype(np.float32)
+
         batch_tensors = []
+        batch_geo_features = []
+        mask_names = []
 
         for m in masks:
             maskB_array = m.decode_mask()
@@ -198,24 +265,111 @@ class tools_api:
             maskB_img = F.resize(maskB_img, self.resize, interpolation=Image.NEAREST)
             maskB_resized = np.array(maskB_img).astype(np.float32)
 
-            # Stack RGB, maskA, maskB as channels (adapt as needed)
+            # Stack RGB, maskA, maskB as channels
             components = [rgb, maskA_resized[..., None], maskB_resized[..., None]]
             input_tensor = np.concatenate(components, axis=-1)
             input_tensor = torch.tensor(input_tensor).permute(2, 0, 1)
             batch_tensors.append(input_tensor)
+            mask_names.append(m.mask_name())
+            
+            # Compute geometric features if using dual-stream
+            if self.use_geometry:
+                geo_feat = self._compute_geometric_features(
+                    maskA_resized, maskB_resized, depth
+                )
+                batch_geo_features.append(geo_feat)
 
         batch_tensor = torch.stack(batch_tensors).to(DEVICE)
 
         with torch.no_grad():
-            # Output: logits, convert to 0/1 using torch.round on sigmoid
-            logits = self.inside_model(batch_tensor)
-            preds = torch.sigmoid(logits)
-            preds = torch.round(preds).long().cpu().numpy()  # 1: inside, 0: outside
+            if self.use_geometry:
+                batch_geo_tensor = torch.stack(batch_geo_features).to(DEVICE)
+                logits = self.inside_model(batch_tensor, batch_geo_tensor)
+            else:
+                logits = self.inside_model(batch_tensor)
+            
+            preds = torch.sigmoid(logits).cpu().numpy()
+            
+            # Debug: print probability scores
+            if debug:
+                print(f"\n=== Inside Debug for {mask_A.mask_name()} ===")
+                for i, (name, prob) in enumerate(zip(mask_names, preds)):
+                    inside_label = "INSIDE" if prob >= self.inside_thres else "OUTSIDE"
+                    print(f"  {name}: prob={prob:.4f} ({inside_label})")
+                print(f"  Threshold: {self.inside_thres}")
+            
+            # Apply threshold
+            preds_binary = (preds >= self.inside_thres).astype(np.int32)
 
-        count = int(preds.sum())
+        count = int(preds_binary.sum())
+        
+        if debug:
+            print(f"  Total count: {count}/{len(masks)}")
+        
         return count
 
-
+    def _compute_geometric_features(self, obj_mask, buffer_mask, depth=None):
+        """
+        Compute 8 geometric features for dual-stream model.
+        
+        Args:
+            obj_mask: [H, W] numpy array (normalized 0-1)
+            buffer_mask: [H, W] numpy array (normalized 0-1)
+            depth: [H, W] numpy array (optional, for depth difference)
+        
+        Returns:
+            torch.Tensor of shape [8]
+        """
+        H, W = obj_mask.shape
+        img_area = H * W
+        
+        # Convert to binary masks
+        obj_binary = (obj_mask > 0.5).astype(np.float32)
+        buffer_binary = (buffer_mask > 0.5).astype(np.float32)
+        
+        # Feature 1: IoU
+        intersection = np.sum(obj_binary * buffer_binary)
+        union = np.sum(np.maximum(obj_binary, buffer_binary))
+        iou = intersection / union if union > 0 else 0.0
+        
+        # Feature 2-3: Area ratios
+        obj_area = np.sum(obj_binary)
+        buffer_area = np.sum(buffer_binary)
+        obj_area_norm = obj_area / img_area
+        buffer_area_norm = buffer_area / img_area
+        
+        # Feature 4-5: Overlap ratios
+        overlap_obj_ratio = intersection / obj_area if obj_area > 0 else 0.0
+        overlap_buffer_ratio = intersection / buffer_area if buffer_area > 0 else 0.0
+        
+        # Feature 6-7: Object center (normalized)
+        y_coords, x_coords = np.where(obj_binary > 0)
+        if len(x_coords) > 0:
+            center_x = np.mean(x_coords) / W
+            center_y = np.mean(y_coords) / H
+        else:
+            center_x, center_y = 0.5, 0.5
+        
+        # Feature 8: Depth difference
+        if depth is not None:
+            obj_depth_mean = np.mean(depth[obj_binary > 0]) if np.sum(obj_binary) > 0 else 0
+            buffer_depth_mean = np.mean(depth[buffer_binary > 0]) if np.sum(buffer_binary) > 0 else 0
+            depth_diff = obj_depth_mean - buffer_depth_mean
+        else:
+            depth_diff = 0.0
+        
+        features = np.array([
+            iou,
+            obj_area_norm,
+            buffer_area_norm,
+            overlap_obj_ratio,
+            overlap_buffer_ratio,
+            center_x,
+            center_y,
+            depth_diff
+        ], dtype=np.float32)
+        
+        return torch.from_numpy(features)
     def most_right(self, masks: List[Mask]) -> int:
         max_x = -1
         rightmost_id = -1
