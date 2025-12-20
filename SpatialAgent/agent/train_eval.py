@@ -1698,6 +1698,12 @@ def main():
             'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
             'num_geo_features': 3      # 3 simple geometric features [mean_depth_1, mean_depth_2, centroid_dist_2d]
         },
+        closest_dist_model_cfg={
+            'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
+            'use_geometry': True,      # 使用 geometric features
+            'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
+            'num_geo_features': 14      # 14 geometric features
+        },
         # inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
         inside_model_cfg={
         'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/ckpt_full/best_model.pth',  # ← 新模型路徑

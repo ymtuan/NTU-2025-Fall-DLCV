@@ -15,10 +15,19 @@ from inside_pred.model import build_inside_model
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class tools_api:
-    def __init__(self, dist_model_cfg, inside_model_cfg, small_dist_model_cfg, resize=(360,640), mask_IoU_thres=0.3, inside_thres=0.5, cascade_dist_thres=300, clamp_distance_thres=25, img_path=None):
+    def __init__(self, dist_model_cfg, inside_model_cfg, small_dist_model_cfg, resize=(360,640), mask_IoU_thres=0.3, inside_thres=0.5, cascade_dist_thres=300, clamp_distance_thres=25, img_path=None, closest_dist_model_cfg=None):
         self.model = build_dist_model(dist_model_cfg)
         self.inside_model = build_inside_model(inside_model_cfg)
         self.small_dist_model = build_dist_model(small_dist_model_cfg)
+        # Build closest model if provided, otherwise use the same model as dist
+        if closest_dist_model_cfg is not None:
+            self.closest_model = build_dist_model(closest_dist_model_cfg)
+            self.closest_use_geometry = closest_dist_model_cfg.get('use_geometry', False)
+            self.closest_use_shortcut = closest_dist_model_cfg.get('use_shortcut', False)
+        else:
+            self.closest_model = self.model  # Fallback to dist model
+            self.closest_use_geometry = dist_model_cfg.get('use_geometry', False)
+            self.closest_use_shortcut = dist_model_cfg.get('use_shortcut', False)
         self.use_geometry = inside_model_cfg.get('use_geometry', False)
         self.dist_use_geometry = dist_model_cfg.get('use_geometry', False)  # 記錄 distance model 是否使用 geometry
         self.dist_use_shortcut = dist_model_cfg.get('use_shortcut', False)  # 記錄是否使用 ResNetWithShortcut
@@ -37,8 +46,8 @@ class tools_api:
     def update_image(self, img_path):
         self.img_path = img_path
         assert os.path.exists(self.img_path), f"Image path {self.img_path} does not exist."
-        # 如果 dist model 或 inside model 任一需要 geometry，就載入 depth
-        if self.use_geometry or self.dist_use_geometry:
+        # 如果 dist model、closest model 或 inside model 任一需要 geometry，就載入 depth
+        if self.use_geometry or self.dist_use_geometry or self.closest_use_geometry:
             # 嘗試兩種 depth 路徑：
             # 1. 同目錄下的 _depth.png 後綴（舊格式）
             # 2. ../depths/ 目錄下的同名檔案（新格式）
@@ -107,6 +116,8 @@ class tools_api:
                 # 輸出已經是正確單位的距離，不需要除以 100
                 #print(f"[DEBUG dist()] Calling model with geo_features")
                 predicted_distance = self.model(input_tensor, geo_features).item()
+                # Clamp negative distances to 0 (distance should be non-negative)
+                predicted_distance = max(predicted_distance, 0.0)
                 #print(f"[DEBUG dist()] Predicted distance (geometry model, no /100): {predicted_distance}")
             else:
                 # 使用 baseline model 時，使用 cascade 策略
@@ -265,9 +276,9 @@ class tools_api:
         rgb = F.resize(rgb, self.resize)
         rgb = np.array(rgb).astype(np.float32) / 255.0
 
-        # Load depth if using geometry
+        # Load depth if using geometry (use closest model's geometry setting)
         depth_np = None
-        if self.dist_use_geometry and self.depth_path and os.path.exists(self.depth_path):
+        if self.closest_use_geometry and self.depth_path and os.path.exists(self.depth_path):
             depth = Image.open(self.depth_path)
             depth = F.resize(depth, self.resize, interpolation=Image.BILINEAR)
             depth_np = np.array(depth).astype(np.float32) / 65535.0
@@ -288,11 +299,11 @@ class tools_api:
             maskB_img = F.resize(maskB_img, self.resize, interpolation=Image.NEAREST)
             maskB_resized = np.array(maskB_img).astype(np.float32)
 
-            # Stack inputs
-            if self.dist_use_geometry and depth_np is not None:
+            # Stack inputs (use closest model's geometry setting)
+            if self.closest_use_geometry and depth_np is not None:
                 components = [rgb, depth_np[..., None], maskA_resized[..., None], maskB_resized[..., None]]
                 # Compute geometric features
-                if self.dist_use_shortcut:
+                if self.closest_use_shortcut:
                     geo_feat = self._compute_simple_dist_geometric_features(maskA_resized, maskB_resized, depth_np)
                 else:
                     geo_feat = self._compute_dist_geometric_features(maskA_resized, maskB_resized, depth_np)
@@ -306,18 +317,21 @@ class tools_api:
 
         batch_tensor = torch.stack(batch_tensors).to(DEVICE)  # N x C x H x W
 
-        # Model inference
+        # Model inference (use closest model)
         with torch.no_grad():
-            if self.dist_use_geometry and depth_np is not None:
-                batch_geo_features = torch.stack(batch_geo_features).to(DEVICE)  # N x 14
-                predicted_distances = self.model(batch_tensor, batch_geo_features).cpu().numpy()
+            if self.closest_use_geometry and depth_np is not None:
+                batch_geo_features = torch.stack(batch_geo_features).to(DEVICE)  # N x 14 or N x 3
+                predicted_distances = self.closest_model(batch_tensor, batch_geo_features).cpu().numpy()
             else:
-                predicted_distances = self.model(batch_tensor).cpu().numpy()
+                predicted_distances = self.closest_model(batch_tensor).cpu().numpy()
 
         # Find the mask with the smallest predicted distance
         # 只有 baseline model (沒用 geometry) 才需要除以 100
-        if not self.dist_use_geometry:
+        if not self.closest_use_geometry:
             predicted_distances = predicted_distances / 100.0
+        
+        # Clamp negative distances to 0 (distance should be non-negative)
+        predicted_distances = np.maximum(predicted_distances, 0.0)
         
         # Debug: print each mask's predicted distance
         print(f"\n[DEBUG closest()] Predicted distances for {mask_A.mask_name()}:")

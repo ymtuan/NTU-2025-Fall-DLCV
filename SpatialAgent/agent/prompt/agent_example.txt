@@ -10,10 +10,12 @@ closest(mask_1, list_of_masks): Returns the ID of the closest mask to mask_1 amo
 - Argument count: EXACTLY 2 arguments (mask_1, list_of_masks)
 - The second argument MUST be a list [mask_2, mask_3, ...], NOT individual masks
 - MEANING: "Which one in list_of_masks is closest to mask_1?"
+- CRITICAL: First arg is the REFERENCE POINT, second arg is the CANDIDATES to choose from
 - Example: closest(shelf_0, [buffer_0, buffer_1, buffer_2]) → finds which buffer is closest to shelf_0
 - Example: closest(buffer_1, [pallet_0, pallet_1, shelf_3]) → finds which object is closest to buffer_1
 - WRONG: closest(buffer_1, pallet_0, pallet_1, shelf_3)  ❌ Too many arguments!
 - WRONG: closest(buffer_0, [buffer_1, buffer_2]) when you want to find buffer closest to shelf_0 ❌ First arg should be shelf_0!
+- WRONG: closest(buffer_0, [buffer_0, buffer_1, buffer_2]) when you want buffer closest to shelf_0 ❌ First arg must be shelf_0, not a buffer!
 
 is_left(mask_1, mask_2): Returns True if mask_1 is to the left of mask_2.
 - Argument count: EXACTLY 2 arguments (mask_1, mask_2)
@@ -103,7 +105,24 @@ or
 only output the answer when you got the final answer.  
 </answer>
 
-IMPORTANT: After receiving a tool result, if you determine that the tool result is the final answer to the question, you can mark it by outputting <final> tag. For example:
+IMPORTANT: After receiving a tool result, ALWAYS reconsider the original question and the current result:
+1. Read the original question again carefully - what is it really asking for?
+2. Check if the current tool result directly answers the question or is just an intermediate step
+3. For multi-step problems (e.g., "which pallet should transporter retrieve"), intermediate results (like is_empty() returning a transporter) are NOT the final answer
+4. Only mark a result as final (<final> tag) if it truly answers the question completely
+
+Example of CORRECT multi-step reasoning:
+- Question: "Which pallet should transporter_0 retrieve?"
+- Step 1: Call is_empty([transporter_0]) → Result: transporter_0 (this is INTERMEDIATE, not final!)
+- Step 2: Call closest(transporter_0, [pallet_0, pallet_1, ...]) → Result: pallet_2 (THIS is the final answer)
+- Mark as final: <final>pallet_2</final>
+
+Example of WRONG reasoning:
+- Question: "Which pallet should transporter_0 retrieve?"
+- Step 1: Call is_empty([transporter_0]) → Result: transporter_0
+- WRONG: Marking transporter_0 as final ❌ This doesn't answer which PALLET to retrieve!
+
+After receiving a tool result, if you determine that the tool result is the final answer to the question, you can mark it by outputting <final> tag. For example:
 Tool result: True
 <final>
 This indicates that the tool result (True) should be used as the final answer. For direction questions (is_left/is_right), the boolean result will be automatically converted to "left" or "right" direction string.  
