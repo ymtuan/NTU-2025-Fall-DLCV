@@ -28,7 +28,7 @@ class Mask:
                 f"object_id={self.object_id}, "
                 f"region_id={self.region_id}) ")
 
-def parse_masks_from_conversation(conversation: str, rle_data: List[Dict]) -> Dict[str, Mask]:
+def parse_masks_from_conversation(conversation: str, rle_data: List[Dict], llm_client=None) -> Dict[str, Mask]:
     """
     Parses mask references from the conversation and builds Mask objects,
     storing them in a dictionary with keys like 'pallet_mask_0'.
@@ -36,12 +36,18 @@ def parse_masks_from_conversation(conversation: str, rle_data: List[Dict]) -> Di
     Supports two formats:
     1. <object_class>_<id> format (e.g., <pallet_0>, <buffer_1>) - used in test set
     2. <mask> format - used in train set, masks are assigned sequentially
+    
+    Args:
+        conversation: The conversation/question text containing mask references
+        rle_data: List of RLE dictionaries for the masks
+        llm_client: Optional LLM client for mask type classification (if None, uses rule-based)
     """
     # Regex to find masks: matches <pallet_mask_0>, <transporter_mask_1> etc.
     mask_pattern = re.compile(r"<([a-zA-Z]+)_(\d+)>")
     
     # Regex to find generic <mask> tags
-    generic_mask_pattern = re.compile(r"<mask>")
+    # Use same pattern as in classification functions to ensure consistency
+    generic_mask_pattern = re.compile(r"<mask(?:>)?")
 
     # Find all matches in the conversation
     matches = mask_pattern.findall(conversation)
@@ -73,57 +79,30 @@ def parse_masks_from_conversation(conversation: str, rle_data: List[Dict]) -> Di
     
     # If we only found generic <mask> tags (format 2 - train set)
     elif generic_masks:
-        # For train set, parse masks based on the order they appear in the question
-        # Pattern: "buffer regions <mask> <mask> <mask> and pallets <mask> <mask>..."
-        conversation_lower = conversation.lower()
+        # Use LLM for mask type classification if available
+        if llm_client is not None:
+            print(f"Using LLM for mask type classification with {len(generic_masks)} masks")
+            mask_positions = _classify_masks_with_llm(conversation, generic_masks, llm_client)
+            print(mask_positions)
+        else:
+            # Fallback to rule-based classification
+            print(f"Using rule-based classification with {len(generic_masks)} masks")
+            mask_positions = _classify_masks_rule_based(conversation, generic_masks)
+            print(mask_positions)
         
-        # Find all <mask> positions and their context
-        mask_positions = []
-        current_expected_type = None  # Track the current context
+        # Validate: Ensure mask_positions count matches rle_data count
+        if len(mask_positions) != len(rle_data):
+            print(f"Warning: mask_positions count ({len(mask_positions)}) != rle_data count ({len(rle_data)})")
+            # Truncate or pad as needed
+            if len(mask_positions) > len(rle_data):
+                mask_positions = mask_positions[:len(rle_data)]
+            else:
+                # Pad with 'object' type for remaining positions
+                last_pos = mask_positions[-1][0] if mask_positions else 0
+                for i in range(len(mask_positions), len(rle_data)):
+                    mask_positions.append((last_pos + i * 10, 'object'))
         
-        for match in generic_mask_pattern.finditer(conversation):
-            pos = match.start()
-            
-            # Look backwards for object type keywords
-            context_start = max(0, pos - 100)  # 增加上下文範圍
-            context = conversation_lower[context_start:pos]
-            
-            # Determine object type from immediate context
-            obj_type = None
-            
-            # 檢查最近的類型關鍵字
-            type_keywords = ['buffer', 'pallet', 'transporter', 'shelf']
-            best_match = None
-            best_distance = float('inf')
-            
-            for keyword in type_keywords:
-                # 查找關鍵字 + "masks?" 模式
-                patterns = [
-                    f'{keyword} masks?',
-                    f'{keyword}s?',
-                    keyword
-                ]
-                
-                for pattern in patterns:
-                    matches = list(re.finditer(pattern, context))
-                    if matches:
-                        # 找最近的匹配
-                        last_match = matches[-1]
-                        distance = pos - (context_start + last_match.end())
-                        if distance < best_distance:
-                            best_distance = distance
-                            best_match = keyword
-            
-            if best_match:
-                obj_type = best_match
-                current_expected_type = obj_type  # 設置當前期望類型
-            elif current_expected_type:
-                # 如果沒有明確指示，但有前面的上下文，繼續使用
-                obj_type = current_expected_type
-            
-            mask_positions.append((pos, obj_type))
-        
-        # Group consecutive masks by object type
+        # Group consecutive masks by object type and create Mask objects
         current_type = None
         type_counters = {}
         mask_index = 0
@@ -171,6 +150,130 @@ def parse_masks_from_conversation(conversation: str, rle_data: List[Dict]) -> Di
             mask_store[mask_key] = mask_obj
 
     return mask_store
+
+
+import re
+import json
+from typing import List, Tuple
+
+def _classify_masks_with_llm(conversation: str, generic_masks: List, llm_client) -> List[Tuple[int, str]]:
+    """
+    Use LLM to classify mask types by rewriting the sentence with explicit tags.
+    Strategy: Ask LLM to replace <mask> with <pallet>, <buffer>, <shelf>, <transporter>.
+    """
+    mask_count = len(generic_masks)
+    
+    # Few-shot examples are POWERFUL. Don't explain rules, show them.
+    prompt = f"""You are a data parser. Your task is to replace the generic `<mask>` tags in the input text with specific object type tags based on the context.
+    
+    Allowed tags: `<pallet>`, `<buffer>`, `<transporter>`, `<shelf>`, `<object>` (if unsure).
+    
+    Examples:
+    Input: "Given the pallets <mask> <mask> and transporter <mask>, which is closest?"
+    Output: "Given the pallets <pallet> <pallet> and transporter <transporter>, which is closest?"
+    
+    Input: "Count the items in the buffer region among <mask> <mask> <mask>"
+    Output: "Count the items in the buffer region among <buffer> <buffer> <buffer>"
+    
+    Input: "What is the distance between the rightmost shelf among <mask> <mask> and the pallet <mask>?"
+    Output: "What is the distance between the rightmost shelf among <shelf> <shelf> and the pallet <pallet>?"
+    
+    Input: "transporter masks <mask> <mask <mask and buffer masks <mask <mask"
+    Output: "transporter masks <transporter> <transporter> <transporter> and buffer masks <buffer> <buffer>"
+
+    Input: "{conversation}"
+    Output:"""
+
+    try:
+        # Call LLM
+        # Note: temperature is set during client initialization, not here
+        response = llm_client.send_message(prompt)
+        
+        # Clean response
+        response = response.strip()
+        if response.startswith("Output:"):
+            response = response[7:].strip()
+        if response.startswith('"') and response.endswith('"'):
+            response = response[1:-1]
+            
+        # Parse the new tags
+        # Find all tags like <type>
+        tag_pattern = re.compile(r"<(pallet|buffer|transporter|shelf|object)>", re.IGNORECASE)
+        found_tags = tag_pattern.findall(response)
+        
+        # 1. Validation: Check Count
+        if len(found_tags) != mask_count:
+            print(f"Warning: LLM returned {len(found_tags)} tags, expected {mask_count}. Falling back.")
+            # Optional: Retry logic could go here
+            return _classify_masks_rule_based(conversation, generic_masks)
+            
+        # 2. Map back to original positions
+        # We use the original generic_mask_pattern to get start indices
+        generic_mask_pattern = re.compile(r"<mask(?:>)?") # Handle potential typo <mask
+        original_matches = list(generic_mask_pattern.finditer(conversation))
+        
+        mask_positions = []
+        for i, match in enumerate(original_matches):
+            obj_type = found_tags[i].lower()
+            mask_positions.append((match.start(), obj_type))
+            
+        return mask_positions
+
+    except Exception as e:
+        print(f"LLM Classification Error: {e}")
+        return _classify_masks_rule_based(conversation, generic_masks)
+
+def _classify_masks_rule_based(conversation: str, generic_masks: List) -> List[Tuple[int, str]]:
+    """
+    Robust fallback logic.
+    Idea: Split sentence by object keywords and assign types to following masks.
+    """
+    generic_mask_pattern = re.compile(r"<mask(?:>)?")
+    mask_positions = []
+    
+    # Default type
+    current_type = 'object'
+    
+    # Simple state machine scan
+    # Tokenize by identifying keywords and masks
+    # This is a simplified version; a full implementation would iterate through string indices
+    
+    # Let's map positions by finding closest preceding keyword
+    for match in generic_mask_pattern.finditer(conversation):
+        start_idx = match.start()
+        
+        # Look backwards from this mask to find the 'governing' noun
+        preceding_text = conversation[:start_idx].lower()
+        
+        # Define keywords and their search priority (right-to-left)
+        keywords = {
+            'pallet': preceding_text.rfind('pallet'),
+            'buffer': preceding_text.rfind('buffer'),
+            'transporter': preceding_text.rfind('transporter'),
+            'shelf': preceding_text.rfind('shelf')
+        }
+        
+        # Filter out not found (-1)
+        found_keywords = {k: v for k, v in keywords.items() if v != -1}
+        
+        if not found_keywords:
+            obj_type = 'object' # No keyword found before this mask
+        else:
+            # Find the keyword with the largest index (closest to the mask)
+            closest_type = max(found_keywords, key=found_keywords.get)
+            
+            # Distance check (optional): if keyword is too far, maybe reset?
+            # For now, we assume the type persists until a new keyword appears.
+            obj_type = closest_type
+            
+        mask_positions.append((start_idx, obj_type))
+    
+    # Validate: Ensure we found the same number of masks as expected
+    expected_count = len(generic_masks)
+    if len(mask_positions) != expected_count:
+        print(f"Warning: Rule-based classification found {len(mask_positions)} masks, expected {expected_count}")
+    
+    return mask_positions
 
 if __name__ == "__main__":
     

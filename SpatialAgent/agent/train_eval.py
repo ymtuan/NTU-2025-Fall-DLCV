@@ -149,7 +149,8 @@ Category:"""
             'conversation_preview': conversation
         })
         
-        self.masks = parse_masks_from_conversation(conversation, rle_data)
+        # Use LLM for mask classification if available
+        self.masks = parse_masks_from_conversation(conversation, rle_data, llm_client=self.llm_client)
         
         self._log_step('set_masks_complete', {
             'masks_found': len(self.masks),
@@ -343,8 +344,8 @@ Category:"""
                 'raw_answer': answer
             })
         
-        # 使用類別特定的答案提取
-        formatted_answer = self._extract_final_answer(answer, category=self.question_category)
+        # 使用類別特定的答案提取（傳入問題上下文以便正確轉換 Boolean）
+        formatted_answer = self._extract_final_answer(answer, category=self.question_category, question=self.question)
         
         # 如果提取失敗（返回 None），說明 LLM 說無法計算
         if formatted_answer is None:
@@ -361,13 +362,13 @@ Category:"""
             'category': self.question_category
         })
         
-        # 如果是左右問題且答案是 true/false，轉換為方向
-        if self.question_category == 'left_right' and formatted_answer.lower() in ['true', 'false']:
-            # 需要從問題或最後的工具命令推斷
-            formatted_answer = self._convert_boolean_answer_to_direction(formatted_answer)
-            self._log_step('format_answer_boolean_converted', {
-                'original': formatted_answer,
-                'converted': formatted_answer
+        # 如果是左右問題且答案是 Boolean 值，使用 LLM 判斷方向
+        if self.question_category == 'left_right' and formatted_answer.lower() in ['true', 'false', 'yes', 'no']:
+            original_boolean = formatted_answer
+            formatted_answer = self._llm_judge_direction_from_boolean(formatted_answer, self.question)
+            self._log_step('format_answer_llm_judged_direction', {
+                'original_boolean': original_boolean,
+                'judged_direction': formatted_answer
             })
         
         # 如果答案是 mask 名稱，需要根據問題類型決定如何處理
@@ -426,12 +427,77 @@ Category:"""
             })
             return formatted_answer
     
-    def _convert_boolean_answer_to_direction(self, boolean_str):
-        """根據問題和可能的工具命令，將布爾字符串轉換為方向
+    def _llm_judge_direction_from_boolean(self, boolean_value, question):
+        """使用 LLM 根據問題和 Boolean 工具結果判斷方向
         
-        This is a fallback when we have boolean answer but need direction
+        Args:
+            boolean_value: 工具返回的 Boolean 值（字符串形式，如 "True", "False"）
+            question: 原始問題
+            
+        Returns:
+            'left' 或 'right'
         """
-        question_lower = self.question.lower()
+        self._log_step('llm_judge_direction_start', {
+            'boolean_value': boolean_value,
+            'question': question[:100]
+        })
+        
+        # 構建 prompt 讓 LLM 判斷方向
+        judgment_prompt = f"""Given a spatial reasoning question and a boolean tool result, determine the final directional answer.
+
+Question: {question}
+
+Tool Result: {boolean_value}
+
+The tool result is a boolean value (True/False) from a spatial function like is_left() or is_right().
+Based on the question and the tool result, determine whether the answer should be "left" or "right".
+
+Examples:
+- Question: "Is pallet_0 to the right of pallet_1?" Tool Result: True → Answer: right
+- Question: "Is pallet_0 to the right of pallet_1?" Tool Result: False → Answer: left
+- Question: "Is pallet_0 to the left of pallet_1?" Tool Result: True → Answer: left
+- Question: "Is pallet_0 to the left of pallet_1?" Tool Result: False → Answer: right
+
+Output ONLY "left" or "right" (lowercase, no explanation).
+
+Answer:"""
+        
+        try:
+            response = self._send_with_retry(judgment_prompt)
+            response = response.strip().lower()
+            
+            # 提取 left 或 right
+            import re
+            direction_match = re.search(r'\b(left|right)\b', response)
+            if direction_match:
+                result = direction_match.group(1)
+                self._log_step('llm_judge_direction_success', {
+                    'llm_response': response,
+                    'extracted_direction': result
+                })
+                return result
+            else:
+                # 如果 LLM 沒有返回有效方向，使用 fallback
+                self._log_step('llm_judge_direction_fallback', {
+                    'llm_response': response,
+                    'reason': 'No valid direction found in LLM response, using fallback'
+                })
+                return self._convert_boolean_answer_to_direction_fallback(boolean_value, question)
+        except Exception as e:
+            self._log_step('llm_judge_direction_error', {
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'reason': 'LLM call failed, using fallback'
+            })
+            # 如果 LLM 調用失敗，使用 fallback
+            return self._convert_boolean_answer_to_direction_fallback(boolean_value, question)
+    
+    def _convert_boolean_answer_to_direction_fallback(self, boolean_str, question):
+        """Fallback 方法：根據問題和可能的工具命令，將布爾字符串轉換為方向
+        
+        This is a fallback when LLM judgment fails
+        """
+        question_lower = question.lower()
         boolean_lower = boolean_str.lower()
         
         # 檢查問題中提到的方向
@@ -439,14 +505,14 @@ Category:"""
         # 如果問題問 "Is X to the right of Y?" 且答案是 true，則答案是 right
         
         if 'is_left' in question_lower or 'to the left' in question_lower:
-            return 'left' if boolean_lower == 'true' else 'right'
+            return 'left' if boolean_lower in ['true', 'yes'] else 'right'
         elif 'is_right' in question_lower or 'to the right' in question_lower:
-            return 'right' if boolean_lower == 'true' else 'left'
+            return 'right' if boolean_lower in ['true', 'yes'] else 'left'
         else:
             # 預設：true -> left, false -> right (based on is_left函數邏輯)
-            return 'left' if boolean_lower == 'true' else 'right'
+            return 'left' if boolean_lower in ['true', 'yes'] else 'right'
 
-    def _extract_final_answer(self, answer_text, category=None):
+    def _extract_final_answer(self, answer_text, category=None, question=None):
         """從答案文本中提取最終答案（類別特定）"""
         import re
         
@@ -468,16 +534,16 @@ Category:"""
                 return result
             
             # 2. 尋找 Boolean 值（如果沒找到方向關鍵詞）
-            # 但不要直接返回 true/false，因為稍後會被轉換
+            # 對於 left_right 問題，如果找到 Boolean 值，直接返回讓 format_answer 用 LLM 判斷
             bool_match = re.search(r'\b(true|false|yes|no)\b', answer_text.lower())
             if bool_match:
                 bool_str = bool_match.group(1).lower()
                 self._log_step('extract_final_answer_left_right_bool', {
                     'bool_value': bool_str,
-                    'reason': 'Boolean value found, will be converted to direction'
+                    'reason': 'Boolean value found, will be judged by LLM in format_answer'
                 })
-                # 直接轉換 boolean 為方向而不是返回 true/false 字符串
-                return 'left' if bool_str in ['true', 'yes'] else 'right'
+                # 返回 Boolean 值，讓 format_answer 用 LLM 判斷方向
+                return bool_str
             
             return answer_text
         
@@ -762,6 +828,74 @@ Category:"""
                 if final_match:
                     final_content = final_match.group(1).strip()
                     
+                    # 檢查是否為多步驟問題，且 <final> 內容只是中間步驟
+                    # 例如："which pallet should transporter retrieve" 問題中，is_empty() 返回 transporter 不應該是最終答案
+                    question_lower = self.question.lower()
+                    is_transporter_retrieve_question = any(keyword in question_lower for keyword in [
+                        'which pallet', 'which object', 'should retrieve', 'should pick', 'should get'
+                    ]) and 'transporter' in question_lower
+                    
+                    # 如果是最後一個工具是 is_empty，且問題問的是 retrieve/pick，則需要檢查是否真的找到了 pallet
+                    if is_transporter_retrieve_question and last_tool_command:
+                        func_match = re.match(r"(\w+)\s*\(", last_tool_command.strip())
+                        if func_match and func_match.group(1) == 'is_empty':
+                            # is_empty 的結果（transporter）只是確認哪個 transporter 是空的
+                            # 還需要繼續找應該 retrieve 的 pallet
+                            
+                            # 檢查是否在對話歷史中調用過 closest() 或其他選擇函數
+                            # 只檢查實際執行的函數調用（在 <execute> tag 中），而不是系統提示
+                            has_called_selection_function = False
+                            for msg in self.messages:
+                                if isinstance(msg, dict) and 'content' in msg:
+                                    content = msg['content']
+                                    # 只檢查 <execute> tag 中的函數調用，避免誤判系統提示
+                                    execute_pattern = r'<execute>(.*?)</execute>'
+                                    execute_matches = re.findall(execute_pattern, content, re.DOTALL | re.IGNORECASE)
+                                    for execute_content in execute_matches:
+                                        # 檢查是否調用過 closest, most_left, most_right, middle 等選擇函數
+                                        if any(func in execute_content for func in ['closest(', 'most_left(', 'most_right(', 'middle(']):
+                                            has_called_selection_function = True
+                                            break
+                                    if has_called_selection_function:
+                                        break
+                                    
+                            # 也檢查 last_tool_command 是否是選擇函數（如果有的話）
+                            if last_tool_command:
+                                func_match_check = re.match(r"(\w+)\s*\(", last_tool_command.strip())
+                                if func_match_check and func_match_check.group(1) in ['closest', 'most_left', 'most_right', 'middle']:
+                                    has_called_selection_function = True
+                            
+                            # 如果沒有調用過選擇函數，則不應該直接返回答案
+                            if not has_called_selection_function:
+                                self._log_step('final_tag_ignored_missing_selection_step', {
+                                    'final_content': final_content,
+                                    'last_tool': last_tool_command,
+                                    'reason': 'is_empty() was called but no selection function (closest/most_left/etc) was called to find which pallet to retrieve'
+                                })
+                                # 提示 LLM 繼續推理
+                                empty_transporter = str(last_tool_result) if last_tool_result else 'transporter_0'
+                                pallet_list = [m for m in self.masks.keys() if 'pallet' in m.lower()]
+                                pallet_list_str = ', '.join(pallet_list[:5])  # 只顯示前5個
+                                self.messages.append({
+                                    "role": "user",
+                                    "content": f"IMPORTANT: You called is_empty() and got '{empty_transporter}' as the empty transporter. However, the question asks which PALLET/OBJECT the transporter should retrieve. You MUST call closest({empty_transporter}, [{pallet_list_str}]) or another selection function to find which pallet is closest/optimal for the transporter to retrieve. Do NOT guess the answer without calling a function!"
+                                })
+                                continue
+                            
+                            # 如果 final_content 是 transporter（中間步驟），也需要忽略
+                            if 'transporter' in final_content.lower():
+                                self._log_step('final_tag_ignored_intermediate_step', {
+                                    'final_content': final_content,
+                                    'last_tool': last_tool_command,
+                                    'reason': 'is_empty result is intermediate step, need to find pallet to retrieve'
+                                })
+                                # 提示 LLM 繼續推理
+                                self.messages.append({
+                                    "role": "user",
+                                    "content": f"IMPORTANT: The result '{final_content}' from is_empty() only identifies which transporter is empty. The question asks which PALLET/OBJECT the transporter should retrieve. You need to continue by finding the closest pallet using closest({final_content}, [pallet_list]) or similar function."
+                                })
+                                continue
+                    
                     # 如果 <final> 內有內容，直接使用該內容
                     if final_content:
                         self._log_step('final_tag_with_content', {
@@ -884,7 +1018,15 @@ Category:"""
                             'question_category': self.question_category
                         })
                         
-                        self.messages.append({"role": "user", "content": f"Tool result: {result}"})
+                        # 添加提示，讓 LLM 重新審視問題和當前結果
+                        reflection_prompt = f"Tool result: {result}\n\n"
+                        reflection_prompt += "IMPORTANT: Before deciding your next action, please reconsider:\n"
+                        reflection_prompt += "1. What is the original question asking for?\n"
+                        reflection_prompt += "2. Does this tool result directly answer the question, or is it just an intermediate step?\n"
+                        reflection_prompt += "3. If the question requires multiple steps (e.g., 'which pallet should transporter retrieve'), make sure you complete ALL steps before marking as final.\n"
+                        reflection_prompt += "4. For 'which pallet/object should transporter retrieve' questions: is_empty() only identifies which transporter is empty - you MUST continue to find which pallet using closest() or similar function.\n"
+                        
+                        self.messages.append({"role": "user", "content": reflection_prompt})
                         continue
                     except Exception as exec_exc:
                         self._log_step(f'iteration_{usage}_execute_error', {
@@ -1390,6 +1532,10 @@ def main():
     parser.add_argument('--location', type=str, default='global', help='Location for Vertex AI')
     parser.add_argument('--think_mode', action='store_true', help='Enable think mode')
     parser.add_argument('--limit', type=int, default=2000, help='Number of samples to process')
+    parser.add_argument('--id', type=str, default=None,
+                       help='Single sample ID for inference (e.g., --id abc123). If specified, only this ID will be processed.')
+    parser.add_argument('--sample_ids', type=str, nargs='+', default=None,
+                       help='Specific sample IDs to process (e.g., --sample_ids id1 id2 id3). If specified, --limit is ignored. Ignored if --id is specified.')
     parser.add_argument('--llm_type', type=str, default='vllm', 
                        choices=['gemini', 'vllm'], 
                        help='LLM type: gemini, openai (for vLLM), or vllm')
@@ -1485,21 +1631,76 @@ def main():
     
     # 過濾有圖片的項目
     valid_data = []
-    for item in dataset_data:
-        image_path = os.path.join(image_dir, item['image'])
-        if os.path.exists(image_path):
-            valid_data.append(item)
-        if len(valid_data) >= args.limit:
-            break
-    
-    print(f"找到 {len(valid_data)} 個有圖片的項目（限制 {args.limit} 筆）")
+    if args.id:
+        # 如果指定了單個 ID，只處理這一個 ID（單次推理模式）
+        target_id = args.id
+        print(f"單次推理模式: 處理 ID = {target_id}")
+        found = False
+        for item in dataset_data:
+            if item['id'] == target_id:
+                image_path = os.path.join(image_dir, item['image'])
+                if os.path.exists(image_path):
+                    valid_data.append(item)
+                    found = True
+                    print(f"✓ 找到 ID {target_id}，圖片路徑: {image_path}")
+                else:
+                    print(f"✗ 錯誤: ID {target_id} 的圖片不存在: {image_path}")
+                    raise FileNotFoundError(f"圖片不存在: {image_path}")
+                break
+        
+        if not found:
+            print(f"✗ 錯誤: ID {target_id} 在數據集中未找到")
+            raise ValueError(f"ID {target_id} 在 {dataset} 數據集中不存在")
+        
+        print(f"成功載入 1 個樣本（單次推理模式）")
+    elif args.sample_ids:
+        # 如果指定了特定 ID，只處理這些 ID
+        sample_ids_set = set(args.sample_ids)
+        print(f"指定處理 {len(sample_ids_set)} 個特定樣本 ID")
+        for item in dataset_data:
+            if item['id'] in sample_ids_set:
+                image_path = os.path.join(image_dir, item['image'])
+                if os.path.exists(image_path):
+                    valid_data.append(item)
+                else:
+                    print(f"警告: ID {item['id']} 的圖片不存在: {image_path}")
+        
+        # 檢查是否有指定的 ID 沒找到
+        found_ids = {item['id'] for item in valid_data}
+        missing_ids = sample_ids_set - found_ids
+        if missing_ids:
+            print(f"警告: 以下 ID 在數據集中未找到: {missing_ids}")
+        
+        print(f"成功載入 {len(valid_data)}/{len(sample_ids_set)} 個指定樣本")
+    else:
+        # 原有邏輯：按順序處理，直到達到 limit
+        for item in dataset_data:
+            image_path = os.path.join(image_dir, item['image'])
+            if os.path.exists(image_path):
+                valid_data.append(item)
+            if len(valid_data) >= args.limit:
+                break
+        print(f"找到 {len(valid_data)} 個有圖片的項目（限制 {args.limit} 筆）")
     
     # 初始化工具
     tools = tools_api(
-        dist_model_cfg={'model_path': '../distance_est/ckpt/epoch_5_iter_6831.pth'},
+        # dist_model_cfg={
+        #     'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
+        #     'use_geometry': True,      # 使用 geometric features
+        #     'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
+        #     'num_geo_features': 14      
+        # },
+
+        dist_model_cfg={
+            'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/distance_est/ckpt_add_shortcut/best_model.pth',
+            'use_geometry': True,      # 使用 geometric features
+            'use_shortcut': True,      # 使用 ResNetWithShortcut 架构
+            'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
+            'num_geo_features': 3      # 3 simple geometric features [mean_depth_1, mean_depth_2, centroid_dist_2d]
+        },
         # inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
         inside_model_cfg={
-        'model_path': '../inside_pred/ckpt_dual_stream/best_model.pth',  # ← 新模型路徑
+        'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/ckpt_full/best_model.pth',  # ← 新模型路徑
         'use_geometry': True,      # ← 啟用 geometric features
         'input_channels': 5,       # RGB(3) + obj_mask(1) + buffer_mask(1)
         'num_geo_features': 8      # IoU, area_ratios, center_coords, depth_diff
@@ -1530,7 +1731,10 @@ def main():
     category_correct_count = 0  # 分類正確數
     category_total_count = 0  # 有 GT 分類的總數
     
-    for item in tqdm(valid_data, desc="Processing"):
+    # 單次推理模式不使用進度條
+    iterator = valid_data if args.id else tqdm(valid_data, desc="Processing")
+    
+    for item in iterator:
         item_id = item['id']
         ground_truth = item.get('normalized_answer', '')
         
@@ -1540,6 +1744,15 @@ def main():
         
         # 將 image_dir 添加到 item 中，以便 Agent 使用
         item['image_dir'] = image_dir
+        
+        # 單次推理模式：顯示詳細信息
+        if args.id:
+            print(f"\n{'='*60}")
+            print(f"處理 ID: {item_id}")
+            print(f"問題: {item['conversations'][0]['value'][:200]}...")
+            if ground_truth:
+                print(f"Ground Truth: {ground_truth}")
+            print(f"{'='*60}\n")
         
         # 可視化 debug（如果需要）
         if len(results) == 0:  # 只對第一個樣本可視化
@@ -1765,6 +1978,26 @@ def main():
             ]
             json.dump(debug_predictions, f, indent=4)
         print(f"除錯用預測結果（含分類）已保存到: {debug_file}")
+        
+        # 保存詳細的 reasoning 軌跡
+        detail_file = os.path.join(args.output_dir, 'predictions_detail.json')
+        detail_predictions = []
+        for result in results:
+            detail_entry = {
+                'id': result.get('id', ''),
+                'question': result.get('question', ''),
+                'predicted_answer': result.get('predicted', '-1'),
+                'normalized_answer': next((p['normalized_answer'] for p in predictions if p['id'] == result.get('id', '')), None),
+                'predicted_category': result.get('predicted_category', ''),
+                'ground_truth_category': result.get('ground_truth_category', ''),
+                'conversation': result.get('conversation', []),
+                'step_log': result.get('step_log', [])
+            }
+            detail_predictions.append(detail_entry)
+        
+        with open(detail_file, 'w', encoding='utf-8') as f:
+            json.dump(detail_predictions, f, indent=2, ensure_ascii=False)
+        print(f"詳細 reasoning 軌跡已保存到: {detail_file}")
 
 if __name__ == "__main__":
     main()

@@ -12,13 +12,16 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 class DistanceDataset(Dataset):
     def __init__(self, data_dir, json_path, transform=None, rgb=True, depth=True, 
                  resize=(360, 640), cls_bin_center=None, distance_scale=1., 
-                 min_distance=-1., max_distance=100000, use_geometry=False, max_depth=65535.0):
+                 min_distance=-1., max_distance=100000, use_geometry=False, max_depth=65535.0,
+                 simple_geo_features=False):
         """
         Distance Dataset with optional Geometry-Aware features.
         
         Args:
             use_geometry (bool): If True, compute geometric features and return 6-channel input.
             max_depth (float): Maximum depth value for normalization (default: 65535.0 for 16-bit PNG).
+            simple_geo_features (bool): If True, compute only 3 features [mean_depth_1, mean_depth_2, centroid_dist_2d].
+                                      If False, compute 14 features (for GeometryFusedResNet).
         """
         # distance_scale is used to scale to different units (e.g. m, cm, mm)
         self.data_dir = data_dir
@@ -27,6 +30,7 @@ class DistanceDataset(Dataset):
         self.use_rgb = rgb
         self.use_depth = depth
         self.use_geometry = use_geometry
+        self.simple_geo_features = simple_geo_features
         self.resize = resize
         self.transform = transform
         self.max_depth = max_depth
@@ -70,7 +74,10 @@ class DistanceDataset(Dataset):
         print(f"Number of samples after distance filtering: {len(self.samples)}")
         
         if self.use_geometry:
-            print("✓ Geometry-Aware mode enabled: 6-channel input + geometric features")
+            if self.simple_geo_features:
+                print("✓ Geometry-Aware mode enabled: 6-channel input + 3 geometric features [mean_depth_1, mean_depth_2, centroid_dist_2d]")
+            else:
+                print("✓ Geometry-Aware mode enabled: 6-channel input + 14 geometric features")
 
     def __len__(self):
         return len(self.samples)
@@ -80,6 +87,64 @@ class DistanceDataset(Dataset):
         if isinstance(rle['counts'], str):
             rle['counts'] = rle['counts'].encode('utf-8')
         return mask_utils.decode(rle).astype(np.float32)
+    
+    def compute_simple_geo_features(self, mask1, mask2, depth_map):
+        """
+        Compute simplified geometric features: [mean_depth_1, mean_depth_2, centroid_dist_2d]
+        
+        Args:
+            mask1: Binary mask (H, W) as numpy array
+            mask2: Binary mask (H, W) as numpy array
+            depth_map: Depth map (H, W) as numpy array, normalized to [0, 1]
+        
+        Returns:
+            geo_features: Tensor of shape [3] containing:
+                - mean_depth_1: Mean depth of mask1 (normalized to [0, 1])
+                - mean_depth_2: Mean depth of mask2 (normalized to [0, 1])
+                - centroid_dist_2d: Normalized 2D distance between centroids
+        """
+        H, W = mask1.shape
+        diag = np.sqrt(H**2 + W**2)  # Image diagonal for normalization
+        
+        # Ensure binary masks
+        mask1_bin = (mask1 > 0.5).astype(np.float32)
+        mask2_bin = (mask2 > 0.5).astype(np.float32)
+        
+        features = []
+        
+        # --- Feature 1: Mean depth of mask1 ---
+        coords1 = np.where(mask1_bin > 0)
+        if len(coords1[0]) > 0:
+            depth1_vals = depth_map[coords1[0], coords1[1]]
+            mean_depth_1 = np.mean(depth1_vals)
+        else:
+            mean_depth_1 = 0.0
+        features.append(mean_depth_1)
+        
+        # --- Feature 2: Mean depth of mask2 ---
+        coords2 = np.where(mask2_bin > 0)
+        if len(coords2[0]) > 0:
+            depth2_vals = depth_map[coords2[0], coords2[1]]
+            mean_depth_2 = np.mean(depth2_vals)
+        else:
+            mean_depth_2 = 0.0
+        features.append(mean_depth_2)
+        
+        # --- Feature 3: Centroid distance (2D) ---
+        if len(coords1[0]) > 0:
+            centroid1 = np.array([np.mean(coords1[1]), np.mean(coords1[0])])  # (x, y)
+        else:
+            centroid1 = np.array([W/2, H/2])  # Default to image center
+        
+        if len(coords2[0]) > 0:
+            centroid2 = np.array([np.mean(coords2[1]), np.mean(coords2[0])])  # (x, y)
+        else:
+            centroid2 = np.array([W/2, H/2])
+        
+        centroid_dist = np.linalg.norm(centroid1 - centroid2) / diag
+        features.append(centroid_dist)
+        
+        return torch.tensor(features, dtype=torch.float32)
     
     def compute_geo_features(self, mask1, mask2, depth_map):
         """
@@ -91,7 +156,7 @@ class DistanceDataset(Dataset):
             depth_map: Depth map (H, W) as numpy array, normalized to [0, 1]
         
         Returns:
-            geo_features: Tensor of shape [12] containing:
+            geo_features: Tensor of shape [14] containing:
                 - centroid_dist_2d: Normalized 2D distance between centroids
                 - depth_diff: Absolute depth difference between masks
                 - mean_depth_1: Mean depth of mask1
@@ -237,7 +302,10 @@ class DistanceDataset(Dataset):
         if self.use_geometry:
             if depth_map_np is None:
                 depth_map_np = np.zeros(self.resize, dtype=np.float32)
-            geo_features = self.compute_geo_features(mask_a, mask_b, depth_map_np)
+            if self.simple_geo_features:
+                geo_features = self.compute_simple_geo_features(mask_a, mask_b, depth_map_np)
+            else:
+                geo_features = self.compute_geo_features(mask_a, mask_b, depth_map_np)
         
         # --- Process distance label ---
         distance_cls_idx = None

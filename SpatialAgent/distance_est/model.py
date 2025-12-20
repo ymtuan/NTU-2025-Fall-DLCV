@@ -10,6 +10,12 @@ def build_dist_model(model_cfg):
     
     Args:
         model_cfg (dict): Configuration dictionary containing model parameters.
+            - model_path: Path to checkpoint file
+            - use_geometry: Whether to use geometric features (for GeometryFusedResNet)
+            - use_shortcut: Whether to use ResNetWithShortcut (simple shortcut architecture)
+            - input_channels: Number of input channels (default: 5 or 6)
+            - num_geo_features: Number of geometric features (default: 14 for GeometryFusedResNet, 3 for ResNetWithShortcut)
+            - backbone: Backbone architecture (default: 'resnet50')
     
     Returns:
         nn.Module: The constructed distance regressor model.
@@ -17,7 +23,8 @@ def build_dist_model(model_cfg):
     input_channels = model_cfg.get('input_channels', 5)
     backbone = model_cfg.get('backbone', 'resnet50')
     use_geometry = model_cfg.get('use_geometry', False)
-    num_geo_features = model_cfg.get('num_geo_features', 14)
+    use_shortcut = model_cfg.get('use_shortcut', False)
+    num_geo_features = model_cfg.get('num_geo_features', 14 if not use_shortcut else 3)
 
     # load model from path
     if 'model_path' in model_cfg:
@@ -25,7 +32,16 @@ def build_dist_model(model_cfg):
         if not model_path.endswith('.pth'):
             raise ValueError("Model path must end with .pth")
         
-        if use_geometry:
+        if use_shortcut:
+            # ResNetWithShortcut: Simple shortcut architecture with 3 geometric features
+            model = ResNetWithShortcut(
+                in_channels=input_channels,
+                num_geo_features=num_geo_features,
+                backbone=backbone,
+                pretrained=False
+            )
+        elif use_geometry:
+            # GeometryFusedResNet: Dual-stream architecture with 14 geometric features
             model = GeometryFusedResNet(
                 input_channels=input_channels, 
                 num_geo_features=num_geo_features,
@@ -33,6 +49,7 @@ def build_dist_model(model_cfg):
                 pretrained=False
             )
         else:
+            # ResNetDistanceRegressor: Baseline model without geometric features
             model = ResNetDistanceRegressor(
                 input_channels=input_channels, 
                 backbone=backbone, 
@@ -129,6 +146,76 @@ class GeometryFusedResNet(nn.Module):
         distance = self.fusion_head(fused)  # [B, 1]
         
         return distance.squeeze(1)  # [B]
+
+
+class ResNetWithShortcut(nn.Module):
+    """
+    ResNet model with geometric features shortcut connection.
+    Directly concatenates geometric features (mean_depth_1, mean_depth_2, centroid_dist_2d)
+    to the visual features before the final FC layer.
+    """
+    def __init__(self, in_channels=6, num_geo_features=3, backbone='resnet50', pretrained=True):
+        super().__init__()
+        # Backbone
+        self.resnet = getattr(models, backbone)(weights='IMAGENET1K_V1' if pretrained else None)
+        
+        # Modify first layer conv1 to accept custom input channels
+        old_conv = self.resnet.conv1
+        self.resnet.conv1 = nn.Conv2d(
+            in_channels,
+            old_conv.out_channels,
+            kernel_size=old_conv.kernel_size,
+            stride=old_conv.stride,
+            padding=old_conv.padding,
+            bias=old_conv.bias is not None
+        )
+        
+        # Initialize new conv1 weights
+        if pretrained:
+            with torch.no_grad():
+                if in_channels >= 3:
+                    # Copy RGB weights
+                    self.resnet.conv1.weight[:, :3] = old_conv.weight
+                if in_channels == 6:
+                    # Initialize extra channels (Depth + 2 Masks)
+                    # Use average of RGB weights for depth channel
+                    self.resnet.conv1.weight[:, 3] = old_conv.weight.mean(dim=1)
+                    # Initialize mask channels with small random values
+                    nn.init.kaiming_normal_(self.resnet.conv1.weight[:, 4:], mode='fan_out', nonlinearity='relu')
+        
+        # Modify last layer
+        num_visual_feats = self.resnet.fc.in_features  # 2048
+        num_geo_feats = num_geo_features  # 3: [depth_a, depth_b, 2d_dist]
+        
+        # Remove original fc
+        self.resnet.fc = nn.Identity()
+        
+        # New Head: combine visual + geometric features
+        self.fusion_head = nn.Sequential(
+            nn.Linear(num_visual_feats + num_geo_feats, 256),
+            nn.ReLU(),
+            nn.Linear(256, 1)
+        )
+    
+    def forward(self, img, geo_feats):
+        """
+        Args:
+            img: Visual input tensor of shape [B, 6, H, W]
+            geo_feats: Geometric features tensor of shape [B, 3] containing
+                      [mean_depth_1, mean_depth_2, centroid_dist_2d]
+        
+        Returns:
+            distance: Predicted distance of shape [B]
+        """
+        # 1. Visual features
+        visual_emb = self.resnet(img)  # [B, 2048]
+        
+        # 2. Geometric features (should be normalized to [0, 1] in Dataset)
+        # geo_feats: [B, 3]
+        
+        # 3. Concatenate
+        combined = torch.cat([visual_emb, geo_feats], dim=1)  # [B, 2051]
+        return self.fusion_head(combined).squeeze(1)  # [B]
 
 
 class ResNetDistanceRegressor(nn.Module):

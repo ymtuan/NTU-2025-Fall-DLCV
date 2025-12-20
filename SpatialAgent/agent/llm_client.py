@@ -97,22 +97,31 @@ class OpenAIAPIClient(LLMClient):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     
-    def send_message(self, message: str, is_classification: bool = False) -> str:
+    def send_message(self, message: str, is_classification: bool = False, max_tokens: int = None) -> str:
         """發送訊息到 OpenAI API
         
         Args:
             message: 訊息內容
             is_classification: 是否為分類請求（總是純文本）
+            max_tokens: 自定義最大 token 數（如果為 None，使用默認值）
         """
         try:
             if is_classification or not self.is_vision_model:
                 # 純文本請求（分類或文本模型）
                 self.messages.append({"role": "user", "content": message})
+                # 確定 max_tokens：優先使用自定義值，否則根據 is_classification 決定
+                if max_tokens is not None:
+                    tokens_limit = max_tokens
+                elif is_classification:
+                    tokens_limit = 20  # 默認分類請求使用較小的 token 數
+                else:
+                    tokens_limit = self.max_tokens
+                
                 response = self.client.chat.completions.create(
                     model=self.model,
                     messages=self.messages if not is_classification else [{"role": "user", "content": message}],
                     temperature=0.0 if is_classification else self.temperature,
-                    max_tokens=20 if is_classification else self.max_tokens
+                    max_tokens=tokens_limit
                 )
                 response_text = response.choices[0].message.content.strip()
                 

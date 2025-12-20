@@ -20,6 +20,8 @@ class tools_api:
         self.inside_model = build_inside_model(inside_model_cfg)
         self.small_dist_model = build_dist_model(small_dist_model_cfg)
         self.use_geometry = inside_model_cfg.get('use_geometry', False)
+        self.dist_use_geometry = dist_model_cfg.get('use_geometry', False)  # 記錄 distance model 是否使用 geometry
+        self.dist_use_shortcut = dist_model_cfg.get('use_shortcut', False)  # 記錄是否使用 ResNetWithShortcut
         self.resize = resize
         self.mask_IoU_thres = mask_IoU_thres
         self.inside_thres = inside_thres
@@ -35,17 +37,26 @@ class tools_api:
     def update_image(self, img_path):
         self.img_path = img_path
         assert os.path.exists(self.img_path), f"Image path {self.img_path} does not exist."
-        if self.use_geometry:
-            depth_path = img_path.replace('.png', '_depth.png')
-            self.depth_path = depth_path if os.path.exists(depth_path) else None
+        # 如果 dist model 或 inside model 任一需要 geometry，就載入 depth
+        if self.use_geometry or self.dist_use_geometry:
+            # 嘗試兩種 depth 路徑：
+            # 1. 同目錄下的 _depth.png 後綴（舊格式）
+            # 2. ../depths/ 目錄下的同名檔案（新格式）
+            depth_path_1 = img_path.replace('.png', '_depth.png')
+            
+            # 將 /images/ 替換為 /depths/
+            depth_path_2 = img_path.replace('/images/', '/depths/').replace('.png', '_depth.png')
+            
+            self.depth_path = depth_path_2
 
     def dist(self, mask_1: Mask, mask_2: Mask) -> float:
+        print(f"\n[DEBUG dist()] dist_use_geometry={self.dist_use_geometry}, depth_path={self.depth_path}")
 
-        if mask_1.object_class.lower() == 'buffer' and self.inside(mask_1, [mask_2]):
-            return 0.0
+        # if mask_1.object_class.lower() == 'buffer' and self.inside(mask_1, [mask_2]):
+        #     return 0.0
         
-        if mask_2.object_class.lower() == 'buffer' and self.inside(mask_2, [mask_1]):
-            return 0.0
+        # if mask_2.object_class.lower() == 'buffer' and self.inside(mask_2, [mask_1]):
+        #     return 0.0
 
         rgb = Image.open(self.img_path).convert('RGB')
         rgb = F.resize(rgb, self.resize)
@@ -61,26 +72,186 @@ class tools_api:
         mask1_resized = np.array(mask1_img).astype(np.float32)
         mask2_resized = np.array(mask2_img).astype(np.float32)
 
-        # Stack inputs
-        components = [rgb, mask1_resized[..., None], mask2_resized[..., None]]
+        # Load depth if using geometry
+        depth_np = None
+        if self.dist_use_geometry and self.depth_path and os.path.exists(self.depth_path):
+            depth = Image.open(self.depth_path)
+            depth = F.resize(depth, self.resize, interpolation=Image.BILINEAR)
+            depth_np = np.array(depth).astype(np.float32) / 65535.0  # Normalize to [0, 1]
+            
+            # Stack inputs: RGB + Depth + 2 Masks = 6 channels
+            components = [rgb, depth_np[..., None], mask1_resized[..., None], mask2_resized[..., None]]
+        else:
+            # Baseline: RGB + 2 Masks = 5 channels
+            components = [rgb, mask1_resized[..., None], mask2_resized[..., None]]
+            print(f"[DEBUG dist()] Using 5-channel input (RGB + 2 Masks)")
+        
         input_tensor = np.concatenate(components, axis=-1)  # H x W x C
         input_tensor = torch.tensor(input_tensor).permute(2, 0, 1).unsqueeze(0).to(DEVICE)  # 1 x C x H x W
 
+        # Compute geometric features if needed
+        geo_features = None
+        if self.dist_use_geometry and depth_np is not None:
+            if self.dist_use_shortcut:
+                # ResNetWithShortcut uses 3 simple geometric features
+                geo_features = self._compute_simple_dist_geometric_features(mask1_resized, mask2_resized, depth_np)
+                geo_features = geo_features.unsqueeze(0).to(DEVICE)  # [1, 3]
+            else:
+                # GeometryFusedResNet uses 14 geometric features
+                geo_features = self._compute_dist_geometric_features(mask1_resized, mask2_resized, depth_np)
+                geo_features = geo_features.unsqueeze(0).to(DEVICE)  # [1, 14]
+
         with torch.no_grad():
-            predicted_distance = self.model(input_tensor).item()
-            print(f"large scale Predicted distance: {predicted_distance}")
+            if self.dist_use_geometry and geo_features is not None:
+                # 使用 geometry model 時，只用主模型，不使用 cascade small model
+                # 輸出已經是正確單位的距離，不需要除以 100
+                #print(f"[DEBUG dist()] Calling model with geo_features")
+                predicted_distance = self.model(input_tensor, geo_features).item()
+                #print(f"[DEBUG dist()] Predicted distance (geometry model, no /100): {predicted_distance}")
+            else:
+                # 使用 baseline model 時，使用 cascade 策略
+                # Baseline model 輸出是 distance×100，需要除以 100
+                #print(f"[DEBUG dist()] Calling baseline model (will /100)")
+                predicted_distance = self.model(input_tensor).item() / 100.0
+                print(f"[DEBUG dist()] large scale Predicted distance (after /100): {predicted_distance}")
+                
+                # Baseline model 才使用 small model cascade
+                if predicted_distance < self.cascade_dist_thres:
+                    predicted_distance = self.small_dist_model(input_tensor).item() / 100.0
+                    print(f"[DEBUG dist()] small scale Predicted distance (after /100): {predicted_distance}")
+                    
+                    if predicted_distance < self.clamp_distance_thres:
+                        predicted_distance = None
+                        print(f"[DEBUG dist()] Distance clamped to None (< {self.clamp_distance_thres})")
 
-        if predicted_distance < self.cascade_dist_thres:
-            with torch.no_grad():
-                predicted_distance = self.small_dist_model(input_tensor).item()
-                print(f"small scale Predicted distance: {predicted_distance}")
-            if predicted_distance < self.clamp_distance_thres:
-                predicted_distance = None
+        print(f"[DEBUG dist()] Final distance: {predicted_distance}")
+        return round(predicted_distance, 2) if predicted_distance is not None else None
 
-        predicted_distance = predicted_distance / 100.0
+    def _compute_dist_geometric_features(self, mask1, mask2, depth_map):
+        """
+        Compute geometric features for GeometryFusedResNet (Distance Model).
+        
+        Args:
+            mask1: Binary mask [H, W] as numpy array
+            mask2: Binary mask [H, W] as numpy array
+            depth_map: Depth map [H, W] as numpy array, normalized to [0, 1]
+        
+        Returns:
+            geo_features: Tensor of shape [14]
+        """
+        H, W = mask1.shape
+        diag = np.sqrt(H**2 + W**2)
+        
+        mask1_bin = (mask1 > 0.5).astype(np.float32)
+        mask2_bin = (mask2 > 0.5).astype(np.float32)
+        
+        features = []
+        
+        # Centroid distance
+        coords1 = np.where(mask1_bin > 0)
+        coords2 = np.where(mask2_bin > 0)
+        
+        if len(coords1[0]) > 0:
+            centroid1 = np.array([np.mean(coords1[1]), np.mean(coords1[0])])
+        else:
+            centroid1 = np.array([W/2, H/2])
+        
+        if len(coords2[0]) > 0:
+            centroid2 = np.array([np.mean(coords2[1]), np.mean(coords2[0])])
+        else:
+            centroid2 = np.array([W/2, H/2])
+        
+        centroid_dist = np.linalg.norm(centroid1 - centroid2) / diag
+        features.append(centroid_dist)
+        
+        # Depth statistics
+        if len(coords1[0]) > 0:
+            mean_depth_1 = np.mean(depth_map[coords1[0], coords1[1]])
+        else:
+            mean_depth_1 = 0.0
+        
+        if len(coords2[0]) > 0:
+            mean_depth_2 = np.mean(depth_map[coords2[0], coords2[1]])
+        else:
+            mean_depth_2 = 0.0
+        
+        depth_diff = abs(mean_depth_1 - mean_depth_2)
+        features.extend([depth_diff, mean_depth_1, mean_depth_2])
+        
+        # Normalized areas
+        area1 = np.sum(mask1_bin)
+        area2 = np.sum(mask2_bin)
+        features.extend([np.sqrt(area1) / diag, np.sqrt(area2) / diag])
+        
+        # Bounding boxes
+        if len(coords1[0]) > 0:
+            bbox1 = [np.min(coords1[1]) / W, np.min(coords1[0]) / H,
+                    np.max(coords1[1]) / W, np.max(coords1[0]) / H]
+        else:
+            bbox1 = [0.0, 0.0, 0.0, 0.0]
+        features.extend(bbox1)
+        
+        if len(coords2[0]) > 0:
+            bbox2 = [np.min(coords2[1]) / W, np.min(coords2[0]) / H,
+                    np.max(coords2[1]) / W, np.max(coords2[0]) / H]
+        else:
+            bbox2 = [0.0, 0.0, 0.0, 0.0]
+        features.extend(bbox2)
+        
+        return torch.tensor(features, dtype=torch.float32)
 
-        return round(predicted_distance, 2)
-
+    def _compute_simple_dist_geometric_features(self, mask1, mask2, depth_map):
+        """
+        Compute simple geometric features for ResNetWithShortcut (Distance Model).
+        Returns only 3 features: [mean_depth_1, mean_depth_2, centroid_dist_2d]
+        
+        Args:
+            mask1: Binary mask [H, W] as numpy array
+            mask2: Binary mask [H, W] as numpy array
+            depth_map: Depth map [H, W] as numpy array, normalized to [0, 1]
+        
+        Returns:
+            geo_features: Tensor of shape [3]
+        """
+        H, W = mask1.shape
+        diag = np.sqrt(H**2 + W**2)
+        
+        mask1_bin = (mask1 > 0.5).astype(np.float32)
+        mask2_bin = (mask2 > 0.5).astype(np.float32)
+        
+        features = []
+        
+        # Feature 1: Mean depth of mask1
+        coords1 = np.where(mask1_bin > 0)
+        if len(coords1[0]) > 0:
+            mean_depth_1 = np.mean(depth_map[coords1[0], coords1[1]])
+        else:
+            mean_depth_1 = 0.0
+        features.append(mean_depth_1)
+        
+        # Feature 2: Mean depth of mask2
+        coords2 = np.where(mask2_bin > 0)
+        if len(coords2[0]) > 0:
+            mean_depth_2 = np.mean(depth_map[coords2[0], coords2[1]])
+        else:
+            mean_depth_2 = 0.0
+        features.append(mean_depth_2)
+        
+        # Feature 3: Centroid distance (2D)
+        if len(coords1[0]) > 0:
+            centroid1 = np.array([np.mean(coords1[1]), np.mean(coords1[0])])
+        else:
+            centroid1 = np.array([W/2, H/2])
+        
+        if len(coords2[0]) > 0:
+            centroid2 = np.array([np.mean(coords2[1]), np.mean(coords2[0])])
+        else:
+            centroid2 = np.array([W/2, H/2])
+        
+        centroid_dist_2d = np.linalg.norm(centroid1 - centroid2) / diag
+        features.append(centroid_dist_2d)
+        
+        return torch.tensor(features, dtype=torch.float32)
 
     def _centroid(self, mask_array: np.ndarray):
         """Compute the centroid (x, y) of a mask."""
@@ -94,6 +265,13 @@ class tools_api:
         rgb = F.resize(rgb, self.resize)
         rgb = np.array(rgb).astype(np.float32) / 255.0
 
+        # Load depth if using geometry
+        depth_np = None
+        if self.dist_use_geometry and self.depth_path and os.path.exists(self.depth_path):
+            depth = Image.open(self.depth_path)
+            depth = F.resize(depth, self.resize, interpolation=Image.BILINEAR)
+            depth_np = np.array(depth).astype(np.float32) / 65535.0
+
         # Decode and resize mask_A
         maskA_array = mask_A.decode_mask()
         maskA_img = Image.fromarray(maskA_array)
@@ -102,6 +280,8 @@ class tools_api:
 
         # Prepare the batch
         batch_tensors = []
+        batch_geo_features = []
+        
         for m in masks:
             maskB_array = m.decode_mask()
             maskB_img = Image.fromarray(maskB_array)
@@ -109,7 +289,17 @@ class tools_api:
             maskB_resized = np.array(maskB_img).astype(np.float32)
 
             # Stack inputs
-            components = [rgb, maskA_resized[..., None], maskB_resized[..., None]]
+            if self.dist_use_geometry and depth_np is not None:
+                components = [rgb, depth_np[..., None], maskA_resized[..., None], maskB_resized[..., None]]
+                # Compute geometric features
+                if self.dist_use_shortcut:
+                    geo_feat = self._compute_simple_dist_geometric_features(maskA_resized, maskB_resized, depth_np)
+                else:
+                    geo_feat = self._compute_dist_geometric_features(maskA_resized, maskB_resized, depth_np)
+                batch_geo_features.append(geo_feat)
+            else:
+                components = [rgb, maskA_resized[..., None], maskB_resized[..., None]]
+            
             input_tensor = np.concatenate(components, axis=-1)  # H x W x C
             input_tensor = torch.tensor(input_tensor).permute(2, 0, 1)  # C x H x W
             batch_tensors.append(input_tensor)
@@ -118,12 +308,25 @@ class tools_api:
 
         # Model inference
         with torch.no_grad():
-            predicted_distances = self.model(batch_tensor).cpu().numpy()
+            if self.dist_use_geometry and depth_np is not None:
+                batch_geo_features = torch.stack(batch_geo_features).to(DEVICE)  # N x 14
+                predicted_distances = self.model(batch_tensor, batch_geo_features).cpu().numpy()
+            else:
+                predicted_distances = self.model(batch_tensor).cpu().numpy()
 
         # Find the mask with the smallest predicted distance
-        predicted_distances = predicted_distances / 100.0  # scale back to meters if needed
+        # 只有 baseline model (沒用 geometry) 才需要除以 100
+        if not self.dist_use_geometry:
+            predicted_distances = predicted_distances / 100.0
+        
+        # Debug: print each mask's predicted distance
+        print(f"\n[DEBUG closest()] Predicted distances for {mask_A.mask_name()}:")
+        for i, (m, dist) in enumerate(zip(masks, predicted_distances)):
+            print(f"  {i}: {m.mask_name()} -> {dist:.2f}cm")
+        
         min_index = np.argmin(predicted_distances)
         closest_mask = masks[min_index]
+        print(f"  => Closest: {closest_mask.mask_name()} (distance: {predicted_distances[min_index]:.2f}cm)\n")
 
         return closest_mask.mask_name()
 
@@ -274,7 +477,7 @@ class tools_api:
             
             # Compute geometric features if using dual-stream
             if self.use_geometry:
-                geo_feat = self._compute_geometric_features(
+                geo_feat = self._compute_inside_geometric_features(
                     maskA_resized, maskB_resized, depth
                 )
                 batch_geo_features.append(geo_feat)
@@ -308,9 +511,9 @@ class tools_api:
         
         return count
 
-    def _compute_geometric_features(self, obj_mask, buffer_mask, depth=None):
+    def _compute_inside_geometric_features(self, obj_mask, buffer_mask, depth=None):
         """
-        Compute 8 geometric features for dual-stream model.
+        Compute 8 geometric features for dual-stream inside prediction model.
         
         Args:
             obj_mask: [H, W] numpy array (normalized 0-1)
