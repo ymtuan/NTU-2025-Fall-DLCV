@@ -163,3 +163,21 @@ QUICK START STRATEGIES BY QUESTION TYPE:
 → "Which pallet for idle transporter" → First call is_empty() to find idle transporters, THEN find closest pallet to them
 → Questions mentioning "idle/empty transporter" → You MUST call is_empty([transporter_list]) first! Don't skip this step!
 → CRITICAL: When question asks "which pallet/object for transporter X" or "optimal choice for transporter", the answer is a PALLET/OBJECT, NOT the transporter! After finding which transporter is empty with is_empty(), you MUST continue to find closest pallet using closest()!
+
+DISTANCE QUESTIONS - SPECIAL RULES:
+→ STEP-BY-STEP APPROACH REQUIRED: Distance questions often require 2-3 function calls:
+  1. First: Find the specific objects mentioned (leftmost, rightmost, closest, etc.)
+  2. Then: Call dist() with the EXACT objects found in step 1
+→ NEVER ASSUME which object is "on the right" or "on the left" based on IDs!
+  - WRONG: "shelf_1 is rightmost because it has higher ID" ❌
+  - CORRECT: Call most_right([shelf_0, shelf_1]) to find which shelf is rightmost ✓
+→ BOTH objects must be verified before calling dist():
+  - If question says "leftmost pallet" → Call most_left([all_pallets]) first
+  - If question says "shelf on the right" → Call most_right([all_shelves]) first
+  - Only AFTER finding BOTH objects, call dist(object1, object2)
+→ Example workflow for "distance between leftmost pallet and rightmost shelf":
+  1. <execute>most_left([pallet_0, pallet_1, pallet_2, ...])</execute> → Result: pallet_X
+  2. <execute>most_right([shelf_0, shelf_1])</execute> → Result: shelf_Y
+  3. <execute>dist(pallet_X, shelf_Y)</execute> → Result: final distance
+→ TRUST THE RESULT: The dist() function returns the actual distance. Use it as-is.
+→ Edge case - Distance = 0: If objects overlap or one is inside another, distance can be 0. This is valid!

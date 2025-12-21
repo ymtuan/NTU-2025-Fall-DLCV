@@ -15,10 +15,11 @@ from inside_pred.model import build_inside_model
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class tools_api:
-    def __init__(self, dist_model_cfg, inside_model_cfg, small_dist_model_cfg, resize=(360,640), mask_IoU_thres=0.3, inside_thres=0.5, cascade_dist_thres=300, clamp_distance_thres=25, img_path=None, closest_dist_model_cfg=None):
+    def __init__(self, dist_model_cfg, inside_model_cfg, small_dist_model_cfg=None, resize=(360,640), mask_IoU_thres=0.3, inside_thres=0.5, cascade_dist_thres=300, clamp_distance_thres=25, img_path=None, closest_dist_model_cfg=None):
         self.model = build_dist_model(dist_model_cfg)
         self.inside_model = build_inside_model(inside_model_cfg)
-        self.small_dist_model = build_dist_model(small_dist_model_cfg)
+        # Build optional small distance model only if config is provided
+        self.small_dist_model = build_dist_model(small_dist_model_cfg) if small_dist_model_cfg is not None else None
         # Build closest model if provided, otherwise use the same model as dist
         if closest_dist_model_cfg is not None:
             self.closest_model = build_dist_model(closest_dist_model_cfg)
@@ -126,8 +127,8 @@ class tools_api:
                 predicted_distance = self.model(input_tensor).item() / 100.0
                 print(f"[DEBUG dist()] large scale Predicted distance (after /100): {predicted_distance}")
                 
-                # Baseline model 才使用 small model cascade
-                if predicted_distance < self.cascade_dist_thres:
+                # Baseline model 才使用 small model cascade（如果已提供 small model）
+                if self.small_dist_model is not None and predicted_distance < self.cascade_dist_thres:
                     predicted_distance = self.small_dist_model(input_tensor).item() / 100.0
                     print(f"[DEBUG dist()] small scale Predicted distance (after /100): {predicted_distance}")
                     

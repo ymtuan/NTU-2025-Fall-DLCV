@@ -1382,7 +1382,9 @@ def normalize_answer(pred: str, gt: str, tolerance_percent: float = 10.0) -> boo
 
 def analyze_errors(results: list, output_dir: str = '../output', dataset: str = 'train'):
     """分析錯誤案例"""
-    errors = [r for r in results if not r.get('correct', False)]
+    # 只分析有 ground truth 且答錯的案例
+    # 注意：correct=None 表示沒有 GT，不應該被當作錯誤
+    errors = [r for r in results if r.get('correct') is False and r.get('ground_truth') is not None]
     
     if not errors:
         print(f"\n沒有錯誤案例（{dataset} set）")
@@ -1558,6 +1560,12 @@ def main():
     # parser.add_argument('--som_alpha', type=int, default=120, help='SoM mask transparency (0-255)')
     parser.add_argument('--force_llm_category', action='store_true', default=True, 
                        help='Force LLM-based category detection even if dataset provides categories')
+    parser.add_argument('--categories', type=str, nargs='+', default=None,
+                       choices=['left_right', 'count', 'distance', 'mcq'],
+                       help='Only process specific categories (e.g., --categories count distance). If not specified, process all.')
+    parser.add_argument('--skip_categories', type=str, nargs='+', default=None,
+                       choices=['left_right', 'count', 'distance', 'mcq'],
+                       help='Skip specific categories (e.g., --skip_categories left_right). Ignored if --categories is specified.')
     args = parser.parse_args()
     
     # 設置認證（僅 Gemini 需要）
@@ -1608,7 +1616,7 @@ def main():
     
     # 根據選擇的數據集設置路徑
     dataset = args.dataset
-    base_dir = '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/'
+    base_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1'
     if dataset == 'train':
         data_file = os.path.join(base_dir, 'train.json')
         image_dir = os.path.join(base_dir, 'train', 'images')
@@ -1682,36 +1690,58 @@ def main():
                 break
         print(f"找到 {len(valid_data)} 個有圖片的項目（限制 {args.limit} 筆）")
     
+    # 根據 --categories 或 --skip_categories 過濾數據
+    if args.categories:
+        categories_set = set(args.categories)
+        before_filter = len(valid_data)
+        valid_data = [item for item in valid_data if item.get('category') in categories_set]
+        print(f"類別過濾: 只處理 {args.categories}，從 {before_filter} 筆過濾為 {len(valid_data)} 筆")
+    elif args.skip_categories:
+        skip_set = set(args.skip_categories)
+        before_filter = len(valid_data)
+        valid_data = [item for item in valid_data if item.get('category') not in skip_set]
+        print(f"類別過濾: 跳過 {args.skip_categories}，從 {before_filter} 筆過濾為 {len(valid_data)} 筆")
+    
+    if len(valid_data) == 0:
+        print("警告: 過濾後沒有符合條件的數據！")
+        return
+    
     # 初始化工具
     tools = tools_api(
         # dist_model_cfg={
-        #     'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
+        #     # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
+        #     'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/distance_est/ckpt_log_mse/log_mse_best_model.pth',
         #     'use_geometry': True,      # 使用 geometric features
         #     'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
         #     'num_geo_features': 14      
         # },
 
         dist_model_cfg={
-            'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/distance_est/ckpt_add_shortcut/best_model.pth',
+            # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/distance_est/ckpt_add_shortcut/best_model.pth',
+            'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/distance_est/ckpt_add_shortcut/add_short_best_model.pth',
             'use_geometry': True,      # 使用 geometric features
             'use_shortcut': True,      # 使用 ResNetWithShortcut 架构
             'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
             'num_geo_features': 3      # 3 simple geometric features [mean_depth_1, mean_depth_2, centroid_dist_2d]
         },
+
         closest_dist_model_cfg={
-            'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
+            # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
+            'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/distance_est/ckpt_log_mse/log_mse_best_model.pth',
             'use_geometry': True,      # 使用 geometric features
             'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
             'num_geo_features': 14      # 14 geometric features
         },
+
         # inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
         inside_model_cfg={
-        'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/ckpt_full/best_model.pth',  # ← 新模型路徑
-        'use_geometry': True,      # ← 啟用 geometric features
-        'input_channels': 5,       # RGB(3) + obj_mask(1) + buffer_mask(1)
-        'num_geo_features': 8      # IoU, area_ratios, center_coords, depth_diff
+            # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/ckpt_full/best_model.pth',  # ← 新模型路徑
+            'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/inside_pred/ckpt_new/inclusion_model.pth',
+            'use_geometry': True,      # ← 啟用 geometric features
+            'input_channels': 5,       # RGB(3) + obj_mask(1) + buffer_mask(1)
+            'num_geo_features': 8      # IoU, area_ratios, center_coords, depth_diff
         },
-        small_dist_model_cfg={'model_path': '../distance_est/ckpt/3m_epoch6.pth'},
+        # small_dist_model_cfg={'model_path': '../distance_est/ckpt/3m_epoch6.pth'},
         resize=(360, 640),
         mask_IoU_thres=0.3, inside_thres=0.5,
         cascade_dist_thres=300, clamp_distance_thres=25
@@ -1745,7 +1775,8 @@ def main():
         ground_truth = item.get('normalized_answer', '')
         
         # 檢查是否有 ground truth（用於判斷是否需要計算準確率）
-        if ground_truth and not has_ground_truth:
+        # if ground_truth and not has_ground_truth:
+        if ground_truth is not None and ground_truth != '' and not has_ground_truth:
             has_ground_truth = True
         
         # 將 image_dir 添加到 item 中，以便 Agent 使用
@@ -1805,7 +1836,8 @@ def main():
                 print(f"[ERROR] Item {item_id}: {error_msg}")
             
             # 如果有 ground truth，進行答案比較
-            if has_ground_truth and ground_truth:
+            # 注意：ground_truth 可能是 0（有效值），所以要用 is not None 檢查
+            if has_ground_truth and ground_truth is not None and ground_truth != '':
                 is_correct_strict = normalize_answer(formatted_answer, ground_truth, tolerance_percent=0.1)  # 嚴格模式
                 is_correct_10 = normalize_answer(formatted_answer, ground_truth, tolerance_percent=10.0)     # 10% 容錯
                 is_correct_20 = normalize_answer(formatted_answer, ground_truth, tolerance_percent=20.0)     # 20% 容錯
@@ -1834,7 +1866,7 @@ def main():
             result_entry = {
                 'id': item_id,
                 'predicted': str(formatted_answer),
-                'ground_truth': str(ground_truth) if ground_truth else None,
+                'ground_truth': str(ground_truth) if ground_truth is not None and ground_truth != '' else None,
                 'predicted_category': agent.predicted_category,  # LLM predicted category
                 'ground_truth_category': agent.ground_truth_category,  # Dataset GT category
                 'category': agent.ground_truth_category or agent.predicted_category,  # For stats use GT if available
@@ -1844,7 +1876,7 @@ def main():
             }
             
             # 如果有 ground truth，添加準確率信息
-            if has_ground_truth and ground_truth:
+            if has_ground_truth and ground_truth is not None and ground_truth != '':
                 result_entry['correct'] = is_correct_10
                 result_entry['correct_strict'] = is_correct_strict
                 result_entry['correct_10'] = is_correct_10
