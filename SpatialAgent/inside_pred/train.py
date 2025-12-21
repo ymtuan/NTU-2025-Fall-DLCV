@@ -166,9 +166,42 @@ def main(args):
 
     os.makedirs(args.save_path, exist_ok=True)
 
+    # Resume from checkpoint if specified
+    start_epoch = 0
     best_val_acc = 0.0
     
-    for epoch in range(args.epochs):
+    if args.resume:
+        if os.path.exists(args.resume):
+            print(f"Loading checkpoint from {args.resume}...")
+            checkpoint = torch.load(args.resume, map_location=device)
+            
+            # Check if it's a full checkpoint or just model weights
+            if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                # Full checkpoint format (new format)
+                model.load_state_dict(checkpoint['model_state_dict'])
+                
+                # Load optimizer state if available
+                if 'optimizer_state_dict' in checkpoint:
+                    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                
+                # Load scaler state if using AMP
+                if args.use_amp and 'scaler_state_dict' in checkpoint and scaler is not None:
+                    scaler.load_state_dict(checkpoint['scaler_state_dict'])
+                
+                # Load training state
+                start_epoch = checkpoint.get('epoch', 0) + 1  # Start from next epoch
+                best_val_acc = checkpoint.get('best_val_acc', 0.0)
+                
+                print(f"Resumed from epoch {start_epoch}, best_val_acc: {best_val_acc*100:.2f}%")
+            else:
+                # Old format: just model weights (state_dict directly)
+                print("Detected old checkpoint format (model weights only). Loading model weights...")
+                model.load_state_dict(checkpoint)
+                print("Model weights loaded. Starting from epoch 0 (optimizer state not available).")
+        else:
+            print(f"Warning: Checkpoint {args.resume} not found. Starting from scratch.")
+    
+    for epoch in range(start_epoch, args.epochs):
         train_loss, train_acc = train_one_epoch(
             model, train_loader, optimizer, criterion, device, 
             args.use_geometry, scaler, args.accumulation_steps
@@ -178,20 +211,42 @@ def main(args):
         val_loss, val_acc = evaluate(model, val_loader, criterion, device, args.use_geometry)
         print(f"Epoch {epoch+1}/{args.epochs} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc*100:.2f}%")
         
-        # Save checkpoint
-        torch.save(model.state_dict(), f"{args.save_path}/epoch_{epoch+1}.pth")
+        # Save checkpoint (full training state)
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_val_acc': best_val_acc,
+            'val_acc': val_acc,
+            'train_loss': train_loss,
+            'val_loss': val_loss,
+            'args': vars(args)  # Save arguments for reference
+        }
         
-        # Save best model
+        # Add scaler state if using AMP
+        if args.use_amp and scaler is not None:
+            checkpoint['scaler_state_dict'] = scaler.state_dict()
+        
+        # Save epoch checkpoint
+        torch.save(checkpoint, f"{args.save_path}/epoch_{epoch+1}.pth")
+        
+        # Save latest checkpoint
+        torch.save(checkpoint, f"{args.save_path}/latest.pth")
+        
+        # Save best model (state dict only for compatibility)
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save(model.state_dict(), f"{args.save_path}/best_model.pth")
+            # Also save full checkpoint for best model
+            checkpoint['best_val_acc'] = best_val_acc
+            torch.save(checkpoint, f"{args.save_path}/best_checkpoint.pth")
             print(f"✓ New best model saved! Val Acc: {val_acc*100:.2f}%")
 
     print(f"\nTraining completed. Best Val Acc: {best_val_acc*100:.2f}%")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--json", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/data/inclusion_train.json")
+    parser.add_argument("--json", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/data/inclusion_train_mini.json")
     parser.add_argument("--image_dir", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/train/images")
     parser.add_argument("--depth_dir", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/train/depths")
     parser.add_argument("--batch_size", type=int, default=64, help="Batch size per GPU (default: 64)")
@@ -208,5 +263,6 @@ if __name__ == "__main__":
     parser.add_argument("--use_geometry", action="store_true", help="Use GeometryAwareInclusionModel with geometric features")
     parser.add_argument("--focal_alpha", type=float, default=0.25)
     parser.add_argument("--focal_gamma", type=float, default=2.0)
+    parser.add_argument("--resume", type=str, default=None, help="Path to checkpoint to resume from (e.g., ckpt/latest.pth or ckpt/epoch_X.pth)")
     args = parser.parse_args()
     main(args)

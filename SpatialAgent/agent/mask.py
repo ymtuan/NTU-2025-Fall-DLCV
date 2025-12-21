@@ -163,6 +163,17 @@ def _classify_masks_with_llm(conversation: str, generic_masks: List, llm_client)
     """
     mask_count = len(generic_masks)
     
+    # Extract only the relevant part of conversation (after <image> tag if present)
+    # This reduces token usage significantly
+    if '<image>' in conversation:
+        # Find the question part after <image> tag
+        image_idx = conversation.find('<image>')
+        # Get text after <image>, but limit to reasonable length (e.g., 2000 chars)
+        conversation_snippet = conversation[image_idx:image_idx+2000]
+    else:
+        # If no <image> tag, use the conversation but limit length
+        conversation_snippet = conversation[:2000]
+    
     # Few-shot examples are POWERFUL. Don't explain rules, show them.
     prompt = f"""You are a data parser. Your task is to replace the generic `<mask>` tags in the input text with specific object type tags based on the context.
     
@@ -181,13 +192,17 @@ def _classify_masks_with_llm(conversation: str, generic_masks: List, llm_client)
     Input: "transporter masks <mask> <mask <mask and buffer masks <mask <mask"
     Output: "transporter masks <transporter> <transporter> <transporter> and buffer masks <buffer> <buffer>"
 
-    Input: "{conversation}"
+    Input: "{conversation_snippet}"
     Output:"""
 
     try:
         # Call LLM
         # Note: temperature is set during client initialization, not here
-        response = llm_client.send_message(prompt)
+        # Set is_classification=True to avoid accumulating messages in history
+        # Calculate max_tokens based on mask count: each mask needs ~10-15 tokens in output
+        # Add buffer for the rest of the sentence (typically 50-100 tokens)
+        estimated_max_tokens = mask_count * 15 + 100
+        response = llm_client.send_message(prompt, is_classification=True, max_tokens=estimated_max_tokens)
         
         # Clean response
         response = response.strip()
@@ -209,6 +224,7 @@ def _classify_masks_with_llm(conversation: str, generic_masks: List, llm_client)
             
         # 2. Map back to original positions
         # We use the original generic_mask_pattern to get start indices
+        # Use the original conversation (not snippet) to get correct positions
         generic_mask_pattern = re.compile(r"<mask(?:>)?") # Handle potential typo <mask
         original_matches = list(generic_mask_pattern.finditer(conversation))
         

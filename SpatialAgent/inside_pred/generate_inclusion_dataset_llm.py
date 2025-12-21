@@ -125,43 +125,72 @@ def calculate_iou(mask1, mask2):
     if union == 0: return 0.0
     return intersection / union
 
-def generate_negatives(masks, positive_pairs, num_needed, iou_threshold=0.2):
+def generate_hard_negatives(masks, positive_pairs, num_needed, hard_ratio=0.7):
     """
-    Generate negative samples (Label=0) based on low IoU.
-    ensures generated pairs are NOT in positive_pairs.
+    Generate negative samples with a mix of Hard Negatives (High IoU) and Easy Negatives.
+    
+    Args:
+        masks: List of decoded binary masks
+        positive_pairs: List of (obj_id, container_id) tuples that are TRUE positives
+        num_needed: Total number of negative samples needed
+        hard_ratio: Percentage of samples that should be "Hard" (High IoU)
+    
+    Returns:
+        List of (idx1, idx2) tuples representing negative pairs
     """
     num_objs = len(masks)
-    negative_pairs = []
     positive_set = set(positive_pairs)
     
-    attempts = 0
-    max_attempts = num_needed * 50  # 避免死循環
+    # 1. 找出所有可能的 Negative Candidates (排除自己和已知的 Positives)
+    candidates = []
     
-    while len(negative_pairs) < num_needed and attempts < max_attempts:
-        attempts += 1
-        
-        # 隨機選取兩個不同的物件
-        idx1 = random.randint(0, num_objs - 1)
-        idx2 = random.randint(0, num_objs - 1)
-        
-        if idx1 == idx2: continue
-        
-        # 檢查是否已在正樣本集合中 (雙向檢查較安全)
-        if (idx1, idx2) in positive_set or (idx2, idx1) in positive_set:
-            continue
+    # 對於物件數量不多的圖 (N < 100)，雙重迴圈計算所有 IoU 是很快的
+    for i in range(num_objs):
+        for j in range(num_objs):
+            if i == j: 
+                continue
             
-        # 檢查是否重複選取
-        if (idx1, idx2) in negative_pairs:
-            continue
+            # 檢查是否為 Positive (雙向檢查，視為互斥)
+            if (i, j) in positive_set or (j, i) in positive_set:
+                continue
             
-        # 計算 IoU
-        iou = calculate_iou(masks[idx1], masks[idx2])
-        
-        # 只有當 IoU 很低 (確實分開) 才當作負樣本
-        if iou < iou_threshold:
-            negative_pairs.append((idx1, idx2))
-            
-    return negative_pairs
+            # 計算 IoU
+            iou = calculate_iou(masks[i], masks[j])
+            candidates.append({'idx1': i, 'idx2': j, 'iou': iou})
+    
+    # 2. 根據 IoU 排序 (由大到小) -> IoU 越大越 Hard
+    # 我們希望模型學會：即使 IoU 很大 (0.6, 0.7)，只要它不在 positive list 裡，就是 Negative
+    candidates.sort(key=lambda x: x['iou'], reverse=True)
+    
+    selected_negatives = []
+    
+    # 3. 選取 Hard Negatives (高 IoU)
+    num_hard = int(num_needed * hard_ratio)
+    
+    # 從候選列表中取出前 N 個 (IoU 最高的)
+    # 注意：要過濾掉 IoU 太接近 1.0 的 (例如 > 0.95)，那可能是標註漏掉的 Positive，避免汙染
+    hard_candidates = [c for c in candidates if c['iou'] < 0.95]
+    
+    # 取出 Hard samples
+    for item in hard_candidates[:num_hard]:
+        selected_negatives.append((item['idx1'], item['idx2']))
+    
+    # 4. 選取 Easy Negatives (隨機補足剩下的)
+    # 從剩下的候選者中隨機選，或者選 IoU=0 的
+    num_easy = num_needed - len(selected_negatives)
+    if num_easy > 0:
+        remaining_candidates = hard_candidates[num_hard:]
+        if remaining_candidates:
+            # 隨機打亂剩下的，選出 Easy samples
+            random.shuffle(remaining_candidates)
+            for item in remaining_candidates[:num_easy]:
+                selected_negatives.append((item['idx1'], item['idx2']))
+        else:
+            # 如果候選者不夠 (圖很空)，就隨機生成 (雖然可能重複，但機率低)
+            # 這裡簡單處理：如果不夠就只回傳目前的
+            pass
+
+    return selected_negatives
 
 # ==========================================
 # 3. Main Data Processing Logic
@@ -244,12 +273,12 @@ def create_dataset(args):
             # 為了效率，只在此時解碼這張圖的所有 Mask
             decoded_masks = [decode_rle(r) for r in rle_masks]
             
-            # 生成負樣本
-            neg_pairs = generate_negatives(
+            # 生成負樣本 (使用新的 Hard Negative 邏輯)
+            neg_pairs = generate_hard_negatives(
                 decoded_masks, 
                 valid_pos_pairs, 
                 num_needed=len(valid_pos_pairs), # 1:1 平衡
-                iou_threshold=args.neg_iou_thresh
+                hard_ratio=args.hard_ratio # 70% 的負樣本來自高重疊區域
             )
             
             # 6. 寫入資料集
@@ -320,7 +349,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Generate Inclusion Dataset with vLLM')
     
     # Path Arguments
-    parser.add_argument('--input_json', type=str, required=True, help='Path to raw train.json')
+    parser.add_argument('--input_json', type=str, default='/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/train.json')
     parser.add_argument('--output_json', type=str, default='./data/inclusion_train.json')
     parser.add_argument('--max_samples', type=int, default=None, help='Debug: limit number of images')
     
@@ -331,7 +360,8 @@ if __name__ == "__main__":
     parser.add_argument('--api_key', type=str, default='EMPTY')
     
     # Algorithm Arguments
-    parser.add_argument('--neg_iou_thresh', type=float, default=0.2, help='Max IoU for negative samples')
+    parser.add_argument('--neg_iou_thresh', type=float, default=0.2, help='[Deprecated] Max IoU for negative samples (no longer used)')
+    parser.add_argument('--hard_ratio', type=float, default=0.7, help='Ratio of hard negatives (high IoU) in negative samples (default: 0.7)')
 
     args = parser.parse_args()
     
