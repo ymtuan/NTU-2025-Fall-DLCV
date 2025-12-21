@@ -38,6 +38,7 @@ class Agent:
         self.force_llm_category = force_llm_category  # 強制使用 LLM 分類
         self.predicted_category = None  # LLM 預測的類別（用於評估）
         self.ground_truth_category = None  # 數據集提供的真實類別（用於準確率計算）
+        self.last_direction_function = None  # 追蹤最後調用的方向函數 (is_left 或 is_right)
     
     def _detect_question_category_with_llm(self, question):
         """使用 LLM 檢測問題類別（僅 4 種類別）"""
@@ -428,7 +429,7 @@ Category:"""
             return formatted_answer
     
     def _llm_judge_direction_from_boolean(self, boolean_value, question):
-        """使用 LLM 根據問題和 Boolean 工具結果判斷方向
+        """使用追蹤的函數名稱或 LLM 判斷方向
         
         Args:
             boolean_value: 工具返回的 Boolean 值（字符串形式，如 "True", "False"）
@@ -439,58 +440,32 @@ Category:"""
         """
         self._log_step('llm_judge_direction_start', {
             'boolean_value': boolean_value,
-            'question': question[:100]
+            'question': question[:100],
+            'last_direction_function': self.last_direction_function
         })
         
-        # 構建 prompt 讓 LLM 判斷方向
-        judgment_prompt = f"""Given a spatial reasoning question and a boolean tool result, determine the final directional answer.
-
-Question: {question}
-
-Tool Result: {boolean_value}
-
-The tool result is a boolean value (True/False) from a spatial function like is_left() or is_right().
-Based on the question and the tool result, determine whether the answer should be "left" or "right".
-
-Examples:
-- Question: "Is pallet_0 to the right of pallet_1?" Tool Result: True → Answer: right
-- Question: "Is pallet_0 to the right of pallet_1?" Tool Result: False → Answer: left
-- Question: "Is pallet_0 to the left of pallet_1?" Tool Result: True → Answer: left
-- Question: "Is pallet_0 to the left of pallet_1?" Tool Result: False → Answer: right
-
-Output ONLY "left" or "right" (lowercase, no explanation).
-
-Answer:"""
-        
-        try:
-            response = self._send_with_retry(judgment_prompt)
-            response = response.strip().lower()
+        # 如果我們追蹤到了最後調用的方向函數，直接使用它來判斷
+        # 這比依賴問題文字或 LLM 更準確
+        if self.last_direction_function:
+            boolean_lower = boolean_value.lower()
+            is_true = boolean_lower in ['true', 'yes']
             
-            # 提取 left 或 right
-            import re
-            direction_match = re.search(r'\b(left|right)\b', response)
-            if direction_match:
-                result = direction_match.group(1)
-                self._log_step('llm_judge_direction_success', {
-                    'llm_response': response,
-                    'extracted_direction': result
-                })
-                return result
-            else:
-                # 如果 LLM 沒有返回有效方向，使用 fallback
-                self._log_step('llm_judge_direction_fallback', {
-                    'llm_response': response,
-                    'reason': 'No valid direction found in LLM response, using fallback'
-                })
-                return self._convert_boolean_answer_to_direction_fallback(boolean_value, question)
-        except Exception as e:
-            self._log_step('llm_judge_direction_error', {
-                'error': str(e),
-                'error_type': type(e).__name__,
-                'reason': 'LLM call failed, using fallback'
+            if self.last_direction_function == 'is_left':
+                # is_left() 返回 True → 物體在左邊
+                result = 'left' if is_true else 'right'
+            else:  # is_right
+                # is_right() 返回 True → 物體在右邊
+                result = 'right' if is_true else 'left'
+            
+            self._log_step('direction_from_tracked_function', {
+                'function': self.last_direction_function,
+                'boolean_value': boolean_value,
+                'result': result
             })
-            # 如果 LLM 調用失敗，使用 fallback
-            return self._convert_boolean_answer_to_direction_fallback(boolean_value, question)
+            return result
+        
+        # 如果沒有追蹤到函數，使用 fallback（基於問題文字）
+        return self._convert_boolean_answer_to_direction_fallback(boolean_value, question)
     
     def _convert_boolean_answer_to_direction_fallback(self, boolean_str, question):
         """Fallback 方法：根據問題和可能的工具命令，將布爾字符串轉換為方向
@@ -1088,11 +1063,29 @@ Answer:"""
                     if self.question_category == 'left_right':
                         final_answer_lower = final_answer.lower()
                         if final_answer_lower in ['true', 'false', 'yes', 'no']:
-                            final_answer = 'left' if final_answer_lower in ['true', 'yes'] else 'right'
+                            is_true = final_answer_lower in ['true', 'yes']
+                            
+                            # 使用追蹤的方向函數來正確轉換 Boolean
+                            if self.last_direction_function == 'is_left':
+                                # is_left() 返回 True → 物體在左邊; False → 物體在右邊
+                                converted_answer = 'left' if is_true else 'right'
+                            elif self.last_direction_function == 'is_right':
+                                # is_right() 返回 True → 物體在右邊; False → 物體在左邊
+                                converted_answer = 'right' if is_true else 'left'
+                            else:
+                                # Fallback: 沒有追蹤到函數，使用問題文字判斷
+                                question_lower = self.question.lower()
+                                if 'to the right' in question_lower or 'is_right' in question_lower:
+                                    converted_answer = 'right' if is_true else 'left'
+                                else:
+                                    converted_answer = 'left' if is_true else 'right'
+                            
                             self._log_step('final_answer_boolean_converted', {
                                 'original': final_answer_lower,
-                                'converted': final_answer
+                                'converted': converted_answer,
+                                'last_direction_function': self.last_direction_function
                             })
+                            final_answer = converted_answer
                     
                     self.messages.append({"role": "assistant", "content": final_answer})
                     return final_answer
@@ -1280,6 +1273,14 @@ Answer:"""
             })
             
             result = func_map[func_name](*parsed_args)
+            
+            # 追蹤方向函數調用，用於後續 boolean-to-direction 轉換
+            if func_name in ['is_left', 'is_right']:
+                self.last_direction_function = func_name
+                self._log_step('direction_function_tracked', {
+                    'function': func_name,
+                    'result': str(result)  # Convert to string for JSON serialization
+                })
             
             self._log_step('function_executed', {
                 'function': func_name,
@@ -1719,6 +1720,7 @@ def main():
         dist_model_cfg={
             # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/distance_est/ckpt_add_shortcut/best_model.pth',
             'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/distance_est/ckpt_add_shortcut/add_short_best_model.pth',
+            # if use_shortcut is on, use_geometry will not be effected, becuase of the order in SpatialAgent/distance_est/model.py line 35-50
             'use_geometry': True,      # 使用 geometric features
             'use_shortcut': True,      # 使用 ResNetWithShortcut 架构
             'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
@@ -1733,6 +1735,15 @@ def main():
             'num_geo_features': 14      # 14 geometric features
         },
 
+        # training very likely failed due to wrong data preprocessing
+        # closest_dist_model_cfg={
+        #     'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/closest_pred/checkpoints/resnet50_score_20251221_144352/best_model.pth',
+        #     'use_dedicated_closest': True,  # <-- This enables the new closest model
+        #     'use_geometry': True,
+        #     'backbone': 'resnet50',
+        #     'num_geo_features': 7
+        # },
+
         # inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
         inside_model_cfg={
             # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/ckpt_full/best_model.pth',  # ← 新模型路徑
@@ -1743,7 +1754,10 @@ def main():
         },
         # small_dist_model_cfg={'model_path': '../distance_est/ckpt/3m_epoch6.pth'},
         resize=(360, 640),
-        mask_IoU_thres=0.3, inside_thres=0.5,
+        # mask_IoU_thres=0.3, inside_thres=0.5,
+        # mask_IoU_thres=0.3, inside_thres=0.6,
+        # inside_thres=0.6 caused under-counting, try 0.55 as middle ground
+        mask_IoU_thres=0.3, inside_thres=0.55,
         cascade_dist_thres=300, clamp_distance_thres=25
     )
     
@@ -1863,6 +1877,9 @@ def main():
                         print(f"  Ground Truth: {agent.ground_truth_category}")
                         print(f"  Question: {item['conversations'][0]['value'][:100]}")
             
+            # Convert booleans to JSON-serializable types
+            category_correct_val = agent.predicted_category == agent.ground_truth_category if agent.ground_truth_category else None
+            
             result_entry = {
                 'id': item_id,
                 'predicted': str(formatted_answer),
@@ -1870,17 +1887,17 @@ def main():
                 'predicted_category': agent.predicted_category,  # LLM predicted category
                 'ground_truth_category': agent.ground_truth_category,  # Dataset GT category
                 'category': agent.ground_truth_category or agent.predicted_category,  # For stats use GT if available
-                'category_correct': agent.predicted_category == agent.ground_truth_category if agent.ground_truth_category else None,
+                'category_correct': bool(category_correct_val) if category_correct_val is not None else None,
                 'conversation': agent.messages if 'agent' in locals() else [],
                 'question': item['conversations'][0]['value']
             }
             
             # 如果有 ground truth，添加準確率信息
             if has_ground_truth and ground_truth is not None and ground_truth != '':
-                result_entry['correct'] = is_correct_10
-                result_entry['correct_strict'] = is_correct_strict
-                result_entry['correct_10'] = is_correct_10
-                result_entry['correct_20'] = is_correct_20
+                result_entry['correct'] = bool(is_correct_10)
+                result_entry['correct_strict'] = bool(is_correct_strict)
+                result_entry['correct_10'] = bool(is_correct_10)
+                result_entry['correct_20'] = bool(is_correct_20)
             
             # 添加步驟日誌
             if args.save_steps and 'agent' in locals():
@@ -1905,7 +1922,7 @@ def main():
             }
             
             if has_ground_truth and ground_truth:
-                result_entry['correct'] = False
+                result_entry['correct'] = False  # Native Python bool is JSON serializable
                 result_entry['correct_strict'] = False
                 result_entry['correct_10'] = False
                 result_entry['correct_20'] = False

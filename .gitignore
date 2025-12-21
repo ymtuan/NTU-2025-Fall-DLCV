@@ -85,3 +85,11 @@ Thumbs.db
 
 # Git LFS attributes (to avoid git-lfs dependency)
 .gitattributes
+
+# Other
+checkpoint_1220/
+SpatialAgent/1222_TEST_ANALYZE.md
+1221.md
+SpatialAgent/analyze_errors.py
+SpatialAgent/evaluation_comparison.md
+SpatialAgent/1222.md
