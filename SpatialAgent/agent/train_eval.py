@@ -168,7 +168,7 @@ Category:"""
         if 'image_dir' in self.input:
             self.original_image_path = os.path.join(self.input['image_dir'], self.input['image'])
         else:
-            default_image_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1/train/images'
+            default_image_dir = '../../DLCV_Final1/train/images'
             self.original_image_path = os.path.join(default_image_dir, self.input['image'])
         
         if not os.path.exists(self.original_image_path):
@@ -1617,7 +1617,8 @@ def main():
     
     # 根據選擇的數據集設置路徑
     dataset = args.dataset
-    base_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1'
+    # base_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1'
+    base_dir = '../../DLCV_Final1'
     if dataset == 'train':
         data_file = os.path.join(base_dir, 'train.json')
         image_dir = os.path.join(base_dir, 'train', 'images')
@@ -1719,7 +1720,7 @@ def main():
 
         dist_model_cfg={
             # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/distance_est/ckpt_add_shortcut/best_model.pth',
-            'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/distance_est/ckpt_add_shortcut/add_short_best_model.pth',
+            'model_path': '../../checkpoints/add_shortcut.pth',
             # if use_shortcut is on, use_geometry will not be effected, becuase of the order in SpatialAgent/distance_est/model.py line 35-50
             'use_geometry': True,      # 使用 geometric features
             'use_shortcut': True,      # 使用 ResNetWithShortcut 架构
@@ -1729,7 +1730,7 @@ def main():
 
         closest_dist_model_cfg={
             # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/agent/ckpt_log_mse/best_model.pth',
-            'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/distance_est/ckpt_log_mse/log_mse_best_model.pth',
+            'model_path': '../../checkpoints//log_mse.pth',
             'use_geometry': True,      # 使用 geometric features
             'input_channels': 6,       # RGB(3) + Depth(1) + Mask1(1) + Mask2(1)
             'num_geo_features': 14      # 14 geometric features
@@ -1747,7 +1748,7 @@ def main():
         # inside_model_cfg={'model_path': '../inside_pred/ckpt/epoch_4.pth'},
         inside_model_cfg={
             # 'model_path': '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/ckpt_full/best_model.pth',  # ← 新模型路徑
-            'model_path': '/home/ymtuan/dl/DLCV_1141_final_challenge_1/SpatialAgent/inside_pred/ckpt_new/inclusion_model.pth',
+            'model_path': '../../checkpoints/inclusion_model.pth',
             'use_geometry': True,      # ← 啟用 geometric features
             'input_channels': 5,       # RGB(3) + obj_mask(1) + buffer_mask(1)
             'num_geo_features': 8      # IoU, area_ratios, center_coords, depth_diff
