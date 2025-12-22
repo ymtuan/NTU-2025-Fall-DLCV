@@ -346,9 +346,9 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # ... (前面的參數保持不變) ...
-    parser.add_argument("--json", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/inside_pred/data/inclusion_train_mini.json")
-    parser.add_argument("--image_dir", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/train/images")
-    parser.add_argument("--depth_dir", type=str, default="/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data/train/depths")
+    parser.add_argument("--json", type=str, default="data/inclusion_train.json")
+    parser.add_argument("--image_dir", type=str, default="../data/train/images")
+    parser.add_argument("--depth_dir", type=str, default="../data/train/depths")
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--lr", type=float, default=1e-4)

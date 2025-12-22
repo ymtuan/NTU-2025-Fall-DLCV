@@ -27,8 +27,20 @@ bash get_ckpt.sh
 git clone https://huggingface.co/datasets/yaguchi27/DLCV_Final1
 cd DLCV_Final1
 tar -xvf train/images.tar.gz 
+tar -xvf val/images.tar.gz 
 tar -xvf test/images.tar.gz
+tar -xvf train/depths.tar.gz 
+tar -xvf val/depths.tar.gz 
+tar -xvf test/depths.tar.gz
 cd ..
+
+# Move data to SpatialAgent/data directory
+mv DLCV_Final1/train SpatialAgent/data/
+mv DLCV_Final1/val SpatialAgent/data/
+mv DLCV_Final1/test SpatialAgent/data/
+mv DLCV_Final1/train.json SpatialAgent/data/
+mv DLCV_Final1/val.json SpatialAgent/data/
+mv DLCV_Final1/test.json SpatialAgent/data/
 ```
 
 ### 5. Setup VLLM
@@ -59,3 +71,17 @@ python train_eval.py \
 cd ../output
 ```
 prediction file will be saved as predictions.json
+
+## Training 
+
+### distance model training
+```bash
+cd SpatialAgent/distance_est
+python train.py --use_geometry --use_shortcut --pretrained
+```
+
+### inclusion model training
+```bash
+cd SpatialAgent/inside_pred
+python train.py --use_geometry --use_soft_labels --hard_sample_weighting --aux_loss_weight 0.5
+```
