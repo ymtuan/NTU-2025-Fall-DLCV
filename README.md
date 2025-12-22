@@ -79,11 +79,11 @@ prediction file will be saved as predictions.json
 ### distance model training
 ```bash
 cd ./SpatialAgent/distance_est
-python train.py --use_geometry --use_shortcut --pretrained
+python train.py --use_geometry --use_shortcut --pretrained --data_dir ../../DLCV_Final1/train --train_json train_distance_pairs.json --val_json val_distance_pairs.json
 ```
 
 ### inclusion model training
 ```bash
 cd ./SpatialAgent/inside_pred
-python train.py --use_geometry --use_soft_labels --hard_sample_weighting --aux_loss_weight 0.5
+python train.py --use_geometry --use_soft_labels --hard_sample_weighting --aux_loss_weight 0.5  --json data/inclusion_train.json --image_dir ../../DLCV_Final1/train/images/ --depth_dir ../../DLCV_Final1/train/depths/
 ```

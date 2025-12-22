@@ -362,11 +362,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Distance Estimation Model")
     
     # Data
-    parser.add_argument("--data_dir", type=str, default="../data/train",
+    parser.add_argument("--data_dir", type=str, default="../../DLCV_Final1/train",
                         help="Path to training data directory")
-    parser.add_argument("--train_json", type=str, default="train_dist_est.json",
+    parser.add_argument("--train_json", type=str, default="train_distance_pairs.json",
                         help="Path to training JSON")
-    parser.add_argument("--val_json", type=str, default="val_dist_est.json",
+    parser.add_argument("--val_json", type=str, default="val_distance_pairs.json",
                         help="Path to validation JSON (optional)")
     parser.add_argument("--max_depth", type=float, default=65535.0,
                         help="Maximum depth value for normalization")
