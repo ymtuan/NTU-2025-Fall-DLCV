@@ -40,9 +40,7 @@ ENV/
 *.pb
 
 # Output files
-output/
-*.log
-*.out
+SpatialAgent/output/*
 
 # Credentials and secrets
 *credentials*.json
@@ -85,3 +83,16 @@ Thumbs.db
 
 # Git LFS attributes (to avoid git-lfs dependency)
 .gitattributes
+
+# Other
+checkpoint_1220/
+SpatialAgent/1222_TEST_ANALYZE.md
+SpatialAgent/1221.md
+SpatialAgent/analyze_errors.py
+SpatialAgent/evaluation_comparison.md
+SpatialAgent/1222.md
+SpatialAgent/closest_pred/
+SpatialAgent/get_ckpt.sh
+
+# logs
+*.log

@@ -11,23 +11,36 @@ from mask import Mask, parse_masks_from_conversation
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from distance_est.model import build_dist_model
 from inside_pred.model import build_inside_model
+from closest_pred.model import build_closest_model
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 class tools_api:
-    def __init__(self, dist_model_cfg, inside_model_cfg, small_dist_model_cfg, resize=(360,640), mask_IoU_thres=0.3, inside_thres=0.5, cascade_dist_thres=300, clamp_distance_thres=25, img_path=None, closest_dist_model_cfg=None):
+    def __init__(self, dist_model_cfg, inside_model_cfg, small_dist_model_cfg=None, resize=(360,640), mask_IoU_thres=0.3, inside_thres=0.5, cascade_dist_thres=300, clamp_distance_thres=25, img_path=None, closest_dist_model_cfg=None):
         self.model = build_dist_model(dist_model_cfg)
         self.inside_model = build_inside_model(inside_model_cfg)
-        self.small_dist_model = build_dist_model(small_dist_model_cfg)
-        # Build closest model if provided, otherwise use the same model as dist
+        # Build optional small distance model only if config is provided
+        self.small_dist_model = build_dist_model(small_dist_model_cfg) if small_dist_model_cfg is not None else None
+        
+        # Build closest model - two modes:
+        # 1. use_dedicated_closest=True: Use ClosenessScoreModel (outputs 0~1, higher=closer)
+        # 2. use_dedicated_closest=False: Use distance model (outputs distance, lower=closer)
         if closest_dist_model_cfg is not None:
-            self.closest_model = build_dist_model(closest_dist_model_cfg)
+            self.use_dedicated_closest = closest_dist_model_cfg.get('use_dedicated_closest', False)
+            if self.use_dedicated_closest:
+                # Use dedicated closest model from closest_pred
+                self.closest_model = build_closest_model(closest_dist_model_cfg)
+                self.closest_num_geo_features = closest_dist_model_cfg.get('num_geo_features', 7)
+            else:
+                # Use distance model for closest (existing behavior)
+                self.closest_model = build_dist_model(closest_dist_model_cfg)
             self.closest_use_geometry = closest_dist_model_cfg.get('use_geometry', False)
             self.closest_use_shortcut = closest_dist_model_cfg.get('use_shortcut', False)
         else:
             self.closest_model = self.model  # Fallback to dist model
             self.closest_use_geometry = dist_model_cfg.get('use_geometry', False)
             self.closest_use_shortcut = dist_model_cfg.get('use_shortcut', False)
+            self.use_dedicated_closest = False
         self.use_geometry = inside_model_cfg.get('use_geometry', False)
         self.dist_use_geometry = dist_model_cfg.get('use_geometry', False)  # 記錄 distance model 是否使用 geometry
         self.dist_use_shortcut = dist_model_cfg.get('use_shortcut', False)  # 記錄是否使用 ResNetWithShortcut
@@ -61,19 +74,34 @@ class tools_api:
     def dist(self, mask_1: Mask, mask_2: Mask) -> float:
         print(f"\n[DEBUG dist()] dist_use_geometry={self.dist_use_geometry}, depth_path={self.depth_path}")
 
-        # if mask_1.object_class.lower() == 'buffer' and self.inside(mask_1, [mask_2]):
-        #     return 0.0
+        # Check for significant mask overlap - if IoU is high enough, distance is 0
+        mask1_array = mask_1.decode_mask()
+        mask2_array = mask_2.decode_mask()
         
-        # if mask_2.object_class.lower() == 'buffer' and self.inside(mask_2, [mask_1]):
-        #     return 0.0
+        # Compute IoU to detect significant overlap
+        mask1_bin = mask1_array > 0
+        mask2_bin = mask2_array > 0
+        intersection = np.logical_and(mask1_bin, mask2_bin).sum()
+        union = np.logical_or(mask1_bin, mask2_bin).sum()
+        
+        if union > 0:
+            iou = intersection / union
+            # Also check intersection ratio relative to smaller mask
+            min_area = min(mask1_bin.sum(), mask2_bin.sum())
+            intersection_ratio = intersection / min_area if min_area > 0 else 0
+            
+            # Only return 0 if very significant overlap (IoU > 0.3 or intersection covers >50% of smaller mask)
+            if iou > 0.3 or intersection_ratio > 0.45:
+                print(f"[DEBUG dist()] Significant overlap (IoU={iou:.3f}, int_ratio={intersection_ratio:.3f}), returning 0.0")
+                return 0.0
+            elif intersection > 0:
+                print(f"[DEBUG dist()] Minor overlap (IoU={iou:.3f}, int_ratio={intersection_ratio:.3f}), proceeding with model")
 
         rgb = Image.open(self.img_path).convert('RGB')
         rgb = F.resize(rgb, self.resize)
         rgb = np.array(rgb).astype(np.float32) / 255.0
 
-        # Decode and resize masks
-        mask1_array = mask_1.decode_mask()
-        mask2_array = mask_2.decode_mask()
+        # Resize masks (already decoded above for overlap check)
         mask1_img = Image.fromarray(mask1_array)
         mask2_img = Image.fromarray(mask2_array)
         mask1_img = F.resize(mask1_img, self.resize, interpolation=Image.NEAREST)
@@ -126,8 +154,8 @@ class tools_api:
                 predicted_distance = self.model(input_tensor).item() / 100.0
                 print(f"[DEBUG dist()] large scale Predicted distance (after /100): {predicted_distance}")
                 
-                # Baseline model 才使用 small model cascade
-                if predicted_distance < self.cascade_dist_thres:
+                # Baseline model 才使用 small model cascade（如果已提供 small model）
+                if self.small_dist_model is not None and predicted_distance < self.cascade_dist_thres:
                     predicted_distance = self.small_dist_model(input_tensor).item() / 100.0
                     print(f"[DEBUG dist()] small scale Predicted distance (after /100): {predicted_distance}")
                     
@@ -302,8 +330,11 @@ class tools_api:
             # Stack inputs (use closest model's geometry setting)
             if self.closest_use_geometry and depth_np is not None:
                 components = [rgb, depth_np[..., None], maskA_resized[..., None], maskB_resized[..., None]]
-                # Compute geometric features
-                if self.closest_use_shortcut:
+                # Compute geometric features based on model type
+                if self.use_dedicated_closest:
+                    # Dedicated closest model uses 7 geo features
+                    geo_feat = self._compute_closest_geometric_features(maskA_resized, maskB_resized, depth_np)
+                elif self.closest_use_shortcut:
                     geo_feat = self._compute_simple_dist_geometric_features(maskA_resized, maskB_resized, depth_np)
                 else:
                     geo_feat = self._compute_dist_geometric_features(maskA_resized, maskB_resized, depth_np)
@@ -320,29 +351,85 @@ class tools_api:
         # Model inference (use closest model)
         with torch.no_grad():
             if self.closest_use_geometry and depth_np is not None:
-                batch_geo_features = torch.stack(batch_geo_features).to(DEVICE)  # N x 14 or N x 3
-                predicted_distances = self.closest_model(batch_tensor, batch_geo_features).cpu().numpy()
+                batch_geo_features = torch.stack(batch_geo_features).to(DEVICE)
+                predicted_scores = self.closest_model(batch_tensor, batch_geo_features).cpu().numpy()
             else:
-                predicted_distances = self.closest_model(batch_tensor).cpu().numpy()
+                predicted_scores = self.closest_model(batch_tensor).cpu().numpy()
 
-        # Find the mask with the smallest predicted distance
-        # 只有 baseline model (沒用 geometry) 才需要除以 100
-        if not self.closest_use_geometry:
-            predicted_distances = predicted_distances / 100.0
-        
-        # Clamp negative distances to 0 (distance should be non-negative)
-        predicted_distances = np.maximum(predicted_distances, 0.0)
-        
-        # Debug: print each mask's predicted distance
-        print(f"\n[DEBUG closest()] Predicted distances for {mask_A.mask_name()}:")
-        for i, (m, dist) in enumerate(zip(masks, predicted_distances)):
-            print(f"  {i}: {m.mask_name()} -> {dist:.2f}cm")
-        
-        min_index = np.argmin(predicted_distances)
-        closest_mask = masks[min_index]
-        print(f"  => Closest: {closest_mask.mask_name()} (distance: {predicted_distances[min_index]:.2f}cm)\n")
+        # Handle output based on model type
+        if self.use_dedicated_closest:
+            # Dedicated closest model outputs closeness score (0~1, higher=closer)
+            # Find the mask with the HIGHEST score
+            print(f"\n[DEBUG closest()] Predicted closeness scores for {mask_A.mask_name()}:")
+            for i, (m, score) in enumerate(zip(masks, predicted_scores)):
+                print(f"  {i}: {m.mask_name()} -> {score:.4f}")
+            
+            max_index = np.argmax(predicted_scores)
+            closest_mask = masks[max_index]
+            print(f"  => Closest: {closest_mask.mask_name()} (score: {predicted_scores[max_index]:.4f})\n")
+        else:
+            # Distance model outputs distance (lower=closer)
+            # 只有 baseline model (沒用 geometry) 才需要除以 100
+            if not self.closest_use_geometry:
+                predicted_scores = predicted_scores / 100.0
+            
+            # Clamp negative distances to 0 (distance should be non-negative)
+            predicted_scores = np.maximum(predicted_scores, 0.0)
+            
+            print(f"\n[DEBUG closest()] Predicted distances for {mask_A.mask_name()}:")
+            for i, (m, dist) in enumerate(zip(masks, predicted_scores)):
+                print(f"  {i}: {m.mask_name()} -> {dist:.2f}cm")
+            
+            min_index = np.argmin(predicted_scores)
+            closest_mask = masks[min_index]
+            print(f"  => Closest: {closest_mask.mask_name()} (distance: {predicted_scores[min_index]:.2f}cm)\n")
 
         return closest_mask.mask_name()
+    
+    def _compute_closest_geometric_features(self, mask1, mask2, depth_map):
+        """
+        Compute geometric features for dedicated closest model (7 features).
+        
+        Returns:
+            geo_features: Tensor of shape [7]
+        """
+        H, W = mask1.shape
+        diag = np.sqrt(H**2 + W**2)
+        
+        mask1_bin = (mask1 > 0.5).astype(np.float32)
+        mask2_bin = (mask2 > 0.5).astype(np.float32)
+        
+        features = []
+        coords1 = np.where(mask1_bin > 0)
+        coords2 = np.where(mask2_bin > 0)
+        
+        if len(coords1[0]) > 0:
+            mean_depth_1 = np.mean(depth_map[coords1[0], coords1[1]])
+            centroid1 = np.array([np.mean(coords1[1]), np.mean(coords1[0])])
+            area1 = len(coords1[0])
+        else:
+            mean_depth_1 = 0.5
+            centroid1 = np.array([W/2, H/2])
+            area1 = 1
+        
+        if len(coords2[0]) > 0:
+            mean_depth_2 = np.mean(depth_map[coords2[0], coords2[1]])
+            centroid2 = np.array([np.mean(coords2[1]), np.mean(coords2[0])])
+            area2 = len(coords2[0])
+        else:
+            mean_depth_2 = 0.5
+            centroid2 = np.array([W/2, H/2])
+            area2 = 1
+        
+        features.append(mean_depth_1)
+        features.append(mean_depth_2)
+        features.append(np.linalg.norm(centroid1 - centroid2) / diag)
+        features.append(np.clip(np.sqrt(area1) / np.sqrt(area2) if area2 > 0 else 1.0, 0.1, 10.0))
+        features.append(abs(mean_depth_1 - mean_depth_2))
+        features.append((centroid1[0] - centroid2[0]) / W)
+        features.append((centroid1[1] - centroid2[1]) / H)
+        
+        return torch.tensor(features, dtype=torch.float32)
 
 
     def is_left(self, mask_A: Mask, mask_B) -> bool:
@@ -515,8 +602,27 @@ class tools_api:
                     print(f"  {name}: prob={prob:.4f} ({inside_label})")
                 print(f"  Threshold: {self.inside_thres}")
             
-            # Apply threshold
-            preds_binary = (preds >= self.inside_thres).astype(np.int32)
+            # Apply threshold with additional IoU minimum check
+            # Require at least 10% of candidate mask to overlap with reference mask
+            preds_binary = np.zeros(len(preds), dtype=np.int32)
+            for idx, (prob, m) in enumerate(zip(preds, masks)):
+                if prob >= self.inside_thres:
+                    # Additional IoU check: compute overlap ratio
+                    maskB_array = m.decode_mask()
+                    maskA_bin = maskA_array > 0
+                    maskB_bin = maskB_array > 0
+                    intersection = np.logical_and(maskA_bin, maskB_bin).sum()
+                    maskB_area = maskB_bin.sum()
+                    overlap_ratio = intersection / maskB_area if maskB_area > 0 else 0
+                    
+                    # Require at least 5% overlap to count as inside (very lenient to reduce under-counting)
+                    if overlap_ratio >= 0.05:
+                        preds_binary[idx] = 1
+                        if debug:
+                            print(f"  {mask_names[idx]}: overlap_ratio={overlap_ratio:.3f} -> INSIDE")
+                    else:
+                        if debug:
+                            print(f"  {mask_names[idx]}: overlap_ratio={overlap_ratio:.3f} -> REJECTED (< 0.05)")
 
         count = int(preds_binary.sum())
         
