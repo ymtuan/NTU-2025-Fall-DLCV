@@ -73,15 +73,19 @@ class GeometryAwareInclusionModel(nn.Module):
         self.geo_mlp = nn.Sequential(
             nn.Linear(num_geo_features, 64),
             nn.ReLU(),
+            nn.Dropout(p=0.5),
             nn.Linear(64, geo_embed_dim)
         )
+        
+        # 新增：幾何流自己的分類頭（輔助損失用）
+        self.geo_aux_head = nn.Linear(geo_embed_dim, 1)
         
         # Fusion Head: Combines visual and geometric embeddings
         fusion_input_dim = visual_embed_dim + geo_embed_dim  # 128 + 32 = 160
         self.fusion_head = nn.Sequential(
             nn.Linear(fusion_input_dim, 64),
             nn.ReLU(),
-            nn.Dropout(p=0.3),
+            nn.Dropout(p=0.5),
             nn.Linear(64, 1)
         )
         
@@ -92,7 +96,8 @@ class GeometryAwareInclusionModel(nn.Module):
             geo_features: [B, num_geo_features] - geometric features (IoU, depth diff, etc.)
         
         Returns:
-            logits: [B] - binary classification logits
+            main_logits: [B] - main classification logits from fusion head
+            geo_logits: [B] - auxiliary logits from geometric stream (for auxiliary loss)
         """
         # Visual Stream
         visual_embed = self.resnet(images)  # [B, visual_embed_dim]
@@ -100,8 +105,11 @@ class GeometryAwareInclusionModel(nn.Module):
         # Geometric Stream
         geo_embed = self.geo_mlp(geo_features)  # [B, geo_embed_dim]
         
+        # 輔助輸出：幾何流自己的分類頭
+        geo_logits = self.geo_aux_head(geo_embed).squeeze(1)  # [B]
+        
         # Fusion
         combined = torch.cat([visual_embed, geo_embed], dim=1)  # [B, 160]
-        logits = self.fusion_head(combined)  # [B, 1]
+        main_logits = self.fusion_head(combined).squeeze(1)  # [B]
         
-        return logits.squeeze(1)  # [B]
+        return main_logits, geo_logits

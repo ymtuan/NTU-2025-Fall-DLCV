@@ -13,7 +13,7 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 class InsideDataset(Dataset):
     def __init__(self, json_path, image_dir, depth_dir=None, resize=(360, 640), 
-                 use_depth=True, use_geometry=False, max_samples=None):
+                 use_depth=True, use_geometry=False, max_samples=None, use_soft_labels=False):
         with open(json_path, 'r') as f:
             all_data = json.load(f)
         
@@ -57,6 +57,7 @@ class InsideDataset(Dataset):
         self.use_depth = use_depth
         self.use_geometry = use_geometry
         self.resize = resize
+        self.use_soft_labels = use_soft_labels  # 是否使用软标签（仅训练时）
         self.to_tensor = transforms.ToTensor()
         self.resize_tf = transforms.Resize(resize, interpolation=Image.BILINEAR)
         
@@ -71,7 +72,7 @@ class InsideDataset(Dataset):
         """
         Compute geometric features for the dual-stream model.
         Returns a tensor of shape [8] with the following features:
-        1. IoU (Intersection over Union)
+        1. IoU (Intersection over Union) - soft IoU for edge case handling
         2. Object Area / Image Area
         3. Buffer Area / Image Area
         4. Overlap Area / Object Area
@@ -89,13 +90,21 @@ class InsideDataset(Dataset):
         if isinstance(buffer_mask, torch.Tensor):
             buffer_mask = buffer_mask.numpy()
         
-        obj_mask_binary = (obj_mask > 0.5).astype(np.float32)
-        buffer_mask_binary = (buffer_mask > 0.5).astype(np.float32)
+        # 使用软二值化（保留原始 mask 值）来更好地处理 edge case
+        # 这样可以捕捉部分重叠的情况，而不是简单的 0/1 判断
+        # 对于 resize 插值产生的中间值也能更好地处理
+        obj_mask_normalized = np.clip(obj_mask, 0, 1)  # 确保在 [0, 1] 范围
+        buffer_mask_normalized = np.clip(buffer_mask, 0, 1)
         
-        # Feature 1: IoU
-        intersection = np.sum(obj_mask_binary * buffer_mask_binary)
-        union = np.sum(np.clip(obj_mask_binary + buffer_mask_binary, 0, 1))
+        # 计算软 IoU（使用原始 mask 值，而不是硬二值化）
+        # 这样可以更好地捕捉 edge case：部分重叠、边界情况等
+        intersection = np.sum(np.minimum(obj_mask_normalized, buffer_mask_normalized))
+        union = np.sum(np.maximum(obj_mask_normalized, buffer_mask_normalized))
         iou = intersection / (union + 1e-8)
+        
+        # 同时保留硬二值化版本用于面积计算（更稳定）
+        obj_mask_binary = (obj_mask_normalized > 0.5).astype(np.float32)
+        buffer_mask_binary = (buffer_mask_normalized > 0.5).astype(np.float32)
         
         # Feature 2-3: Normalized areas
         obj_area = np.sum(obj_mask_binary)
@@ -178,9 +187,7 @@ class InsideDataset(Dataset):
         else:
             x = torch.cat([img, buffer_mask, obj_mask], dim=0)
         
-        y = torch.tensor(item['inside'], dtype=torch.float32)
-
-        # Compute geometric features if needed
+        # Compute geometric features if needed (for soft label calculation)
         if self.use_geometry:
             depth_obj = depth.squeeze(0) if depth is not None else None
             depth_buffer = depth.squeeze(0) if depth is not None else None
@@ -190,6 +197,23 @@ class InsideDataset(Dataset):
                 depth_obj,
                 depth_buffer
             )
+            
+            # 对于 edge case，使用软标签（基于 IoU）- 仅在训练时启用
+            hard_label = item['inside']
+            
+            if self.use_soft_labels:
+                iou_value = geo_features[0].item()
+                # 如果 IoU 在中间范围，使用软标签
+                if 0.3 <= iou_value <= 0.7:
+                    # 软标签：IoU 越高，标签越接近 1
+                    # 但也要考虑原始标签
+                    soft_label = hard_label * 0.7 + iou_value * 0.3
+                else:
+                    soft_label = hard_label
+                y = torch.tensor(soft_label, dtype=torch.float32)
+            else:
+                y = torch.tensor(hard_label, dtype=torch.float32)
             return x, geo_features, y
         else:
+            y = torch.tensor(item['inside'], dtype=torch.float32)
             return x, y
