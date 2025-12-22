@@ -8,13 +8,13 @@ This repository implements Challenge 1 for 114-1 DLCV final project Warehouse Sp
 ### 1. Clone the repository
 ```bash
 git clone git@github.com:snooow1029/DLCV_1141_final_challenge_1.git
+cd DLCV_1141_final_challenge_1
 ```
 
 ### 2. Create conda environment
 ```bash
 conda env create -f environment.yml
 conda activate DLCV_Final_Challenge_1
-pip install -r requirements.txt
 ```
 
 ### 3. Download checkpoints
