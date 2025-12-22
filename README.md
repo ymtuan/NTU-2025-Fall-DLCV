@@ -15,6 +15,7 @@ cd DLCV_1141_final_challenge_1
 ```bash
 conda env create -f environment.yml
 conda activate DLCV_Final_Challenge_1
+pip install flash-attn --no-build-isolation
 ```
 
 ### 3. Download checkpoints
@@ -26,12 +27,13 @@ bash get_ckpt.sh
 ```bash
 git clone https://huggingface.co/datasets/yaguchi27/DLCV_Final1
 cd DLCV_Final1
-tar -xvf train/images.tar.gz 
-tar -xvf val/images.tar.gz 
-tar -xvf test/images.tar.gz
-tar -xvf train/depths.tar.gz 
-tar -xvf val/depths.tar.gz 
-tar -xvf test/depths.tar.gz
+tar -xvf train/images/images.tar.gz -C train/images/
+tar -xvf val/images/images.tar.gz -C val/images/
+tar -xvf test/images/images.tar.gz -C test/images/
+tar -xvf train/depths/depths.tar.gz -C train/depths/
+tar -xvf val/depths/depths.tar.gz -C val/depths/
+tar -xvf test/depths/depths.tar.gz -C test/depths/
+rm train/images/images.tar.gz val/images/images.tar.gz test/images/images.tar.gz train/depths/depths.tar.gz val/depths/depths.tar.gz test/depths/depths.tar.gz
 cd ..
 
 # Move data to SpatialAgent/data directory
@@ -76,12 +78,12 @@ prediction file will be saved as predictions.json
 
 ### distance model training
 ```bash
-cd SpatialAgent/distance_est
+cd ./SpatialAgent/distance_est
 python train.py --use_geometry --use_shortcut --pretrained
 ```
 
 ### inclusion model training
 ```bash
-cd SpatialAgent/inside_pred
+cd ./SpatialAgent/inside_pred
 python train.py --use_geometry --use_soft_labels --hard_sample_weighting --aux_loss_weight 0.5
 ```
