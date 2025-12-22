@@ -37,12 +37,12 @@ rm train/images/images.tar.gz val/images/images.tar.gz test/images/images.tar.gz
 cd ..
 
 # Move data to SpatialAgent/data directory
-mv DLCV_Final1/train SpatialAgent/data/
-mv DLCV_Final1/val SpatialAgent/data/
-mv DLCV_Final1/test SpatialAgent/data/
-mv DLCV_Final1/train.json SpatialAgent/data/
-mv DLCV_Final1/val.json SpatialAgent/data/
-mv DLCV_Final1/test.json SpatialAgent/data/
+# mv DLCV_Final1/train SpatialAgent/data/
+# mv DLCV_Final1/val SpatialAgent/data/
+# mv DLCV_Final1/test SpatialAgent/data/
+# mv DLCV_Final1/train.json SpatialAgent/data/
+# mv DLCV_Final1/val.json SpatialAgent/data/
+# mv DLCV_Final1/test.json SpatialAgent/data/
 ```
 
 ### 5. Setup VLLM

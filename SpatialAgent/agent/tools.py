@@ -11,7 +11,7 @@ from mask import Mask, parse_masks_from_conversation
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from distance_est.model import build_dist_model
 from inside_pred.model import build_inside_model
-from closest_pred.model import build_closest_model
+# from closest_pred.model import build_closest_model
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -588,7 +588,12 @@ class tools_api:
         with torch.no_grad():
             if self.use_geometry:
                 batch_geo_tensor = torch.stack(batch_geo_features).to(DEVICE)
-                logits = self.inside_model(batch_tensor, batch_geo_tensor)
+                outputs = self.inside_model(batch_tensor, batch_geo_tensor)
+                # 新模型返回 (main_logits, geo_logits)，旧模型只返回 logits
+                if isinstance(outputs, tuple):
+                    logits = outputs[0]  # 使用主输出
+                else:
+                    logits = outputs
             else:
                 logits = self.inside_model(batch_tensor)
             

@@ -27,7 +27,7 @@ def build_inside_model(model_cfg):
         else:
             model = ResNet50Binary(in_channels=in_channels)
         
-        model.load_state_dict(torch.load(model_path, map_location=DEVICE))
+        model.load_state_dict(torch.load(model_path, map_location=DEVICE), strict=False)
         model.eval()
         model.to(DEVICE)
     

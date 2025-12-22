@@ -1618,7 +1618,8 @@ def main():
     # 根據選擇的數據集設置路徑
     dataset = args.dataset
     # base_dir = '/home/ymtuan/dl/DLCV_1141_final_challenge_1/DLCV_Final1'
-    base_dir = '../../DLCV_Final1'
+    # base_dir = '../../DLCV_Final1'
+    base_dir = '/tmp1/d13944024_home/kai/dlcv_final/SpatialAgent/data'
     if dataset == 'train':
         data_file = os.path.join(base_dir, 'train.json')
         image_dir = os.path.join(base_dir, 'train', 'images')

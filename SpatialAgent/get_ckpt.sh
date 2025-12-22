@@ -17,4 +17,6 @@ python -m gdown --id 1ENe42GsqxuP9GbOT64HlmbSfq70mYeg_ -O data.zip
 unzip -o data.zip
 rm data.zip
 
+python -m gdown --id 19vQntI6TV_PuLPB5rO8xCOoSl74J_Eaj -O distance_est/train_distance_pairs.json
+
 echo "Download finished."
