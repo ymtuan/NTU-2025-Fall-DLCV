@@ -2,7 +2,7 @@
 
 This repository implements Challenge 1 for 114-1 DLCV final project Warehouse Spatial Intelligence (Track 3 of Nvidia AI City Challenge in ICCV 2025)
 By analyzing the framework proposed in [this paper](https://arxiv.org/abs/2507.10778), we introduce a two-stage curriculum training strategy for the distance estimation model, achieving near-perfect precision on the validation set.
-In addition, through self-curated dataset construction, we trained an inclusion classification model that improved validation accuracy from approximately 5% to over 90%.
+In addition, through self-curated dataset construction, we trained an inclusion classification model that improved validation accuracy from approximately 57% to over 90%.
 
 Overall, these contributions earned third place in the final project presentation.
 
