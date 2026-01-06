@@ -1,0 +1,6 @@
+distance_est/train_dist_est.json
+distance_est/val_dist_est.json
+
+# Large JSON files
+distance_est/train_distance_pairs.json
+distance_est/val_distance_pairs.json

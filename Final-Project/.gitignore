@@ -1,0 +1,99 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Model files
+*.pth
+*.ckpt
+*.pt
+*.h5
+*.pb
+
+# Output files
+SpatialAgent/output/*
+!SpatialAgent/output/.gitkeep
+
+# Credentials and secrets
+*credentials*.json
+*service_account*.json
+gen-lang-client-*.json
+*.key
+*.pem
+
+# Data files (uncomment if you don't want to commit large data files)
+data/
+*.tar.gz
+*.zip
+*.png
+
+# DLCV_Final1 folder (excluded from repository)
+DLCV_Final1/
+
+# Large JSON data files (exceed GitHub 100MB limit)
+SpatialAgent/data/train/train.json
+SpatialAgent/data/train/train.json
+SpatialAgent/data/train/train_dist_est.json
+SpatialAgent/data/train/inside.json
+SpatialAgent/data/test/rephrased_test.json
+SpatialAgent/data/val/rephrased_val.json
+SpatialAgent/output/*.json
+
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Git LFS attributes (to avoid git-lfs dependency)
+.gitattributes
+
+# Other
+checkpoint_1220/
+SpatialAgent/1222_TEST_ANALYZE.md
+SpatialAgent/1221.md
+SpatialAgent/analyze_errors.py
+SpatialAgent/evaluation_comparison.md
+SpatialAgent/1222.md
+SpatialAgent/closest_pred/
+SpatialAgent/get_ckpt.sh
+
+# logs
+*.log

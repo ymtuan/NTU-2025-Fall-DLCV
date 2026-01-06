@@ -1,0 +1,183 @@
+You are given several functions that operate on mask objects (like pallets, buffers, transporters, and shelves). These functions include:
+
+CRITICAL: Each function has a STRICT argument count limit. You MUST provide EXACTLY the number of arguments specified. Do NOT add extra arguments.
+
+dist(mask_1, mask_2): Returns the distance between two masks.
+- Argument count: EXACTLY 2 arguments (mask_1, mask_2)
+- Example: dist(pallet_0, buffer_1)
+
+closest(mask_1, list_of_masks): Returns the ID of the closest mask to mask_1 among the provided masks.
+- Argument count: EXACTLY 2 arguments (mask_1, list_of_masks)
+- The second argument MUST be a list [mask_2, mask_3, ...], NOT individual masks
+- MEANING: "Which one in list_of_masks is closest to mask_1?"
+- CRITICAL: First arg is the REFERENCE POINT, second arg is the CANDIDATES to choose from
+- Example: closest(shelf_0, [buffer_0, buffer_1, buffer_2]) → finds which buffer is closest to shelf_0
+- Example: closest(buffer_1, [pallet_0, pallet_1, shelf_3]) → finds which object is closest to buffer_1
+- WRONG: closest(buffer_1, pallet_0, pallet_1, shelf_3)  ❌ Too many arguments!
+- WRONG: closest(buffer_0, [buffer_1, buffer_2]) when you want to find buffer closest to shelf_0 ❌ First arg should be shelf_0!
+- WRONG: closest(buffer_0, [buffer_0, buffer_1, buffer_2]) when you want buffer closest to shelf_0 ❌ First arg must be shelf_0, not a buffer!
+
+is_left(mask_1, mask_2): Returns True if mask_1 is to the left of mask_2.
+- Argument count: EXACTLY 2 arguments (mask_1, mask_2)
+- Example: is_left(transporter_0, pallet_2)
+
+is_right(mask_1, mask_2): Returns True if mask_1 is to the right of mask_2.
+- Argument count: EXACTLY 2 arguments (mask_1, mask_2)
+- Example: is_right(shelf_3, pallet_1)
+
+inside(mask_1, list_of_masks): Counts how many of the given masks are inside mask_1.
+- Argument count: EXACTLY 2 arguments (mask_1, list_of_masks)
+- The second argument MUST be a list [mask_2, mask_3, ...], NOT individual masks
+- Example: inside(buffer_1, [pallet_0, pallet_1, pallet_2])
+- SYNTAX RULE: Lists MUST be enclosed in square brackets [] and separated by commas.
+- CORRECT: inside(buffer_1, [pallet_0, pallet_1])
+- WRONG: inside(buffer_1, pallet_0, pallet_1)
+- WRONG: inside(buffer_1, (pallet_0, pallet_1))
+
+most_right(list_of_masks): Returns the ID of the mask that is the rightmost among the given masks.
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Example: most_right([pallet_0, pallet_1, transporter_0, shelf_3])
+- WRONG: most_right(pallet_0, pallet_1, transporter_0, shelf_3)  ❌ Too many arguments!
+
+most_left(list_of_masks): Returns the ID of the mask that is the leftmost among the given masks.
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Example: most_left([pallet_0, pallet_1, transporter_0, shelf_3])
+- WRONG: most_left(pallet_0, pallet_1, transporter_0, shelf_3)  ❌ Too many arguments!
+
+middle(list_of_masks): Returns the ID of the mask that is in the middle of the given masks (sorted by x-coordinate).
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Works with any number of masks (1 or more)
+- Example: middle([pallet_0, pallet_1, transporter_0])
+- Example: middle([buffer_0, buffer_1, buffer_2, buffer_3])  # Works with 4 masks too
+- WRONG: middle(pallet_0, pallet_1, transporter_0)  ❌ Too many arguments!
+
+is_empty(list_of_masks): Returns a list of transporter IDs that are empty. Only provide transporter masks as input.
+- Argument count: EXACTLY 1 argument (a list of masks)
+- The argument MUST be a list [mask_1, mask_2, ...], NOT individual masks
+- Example: is_empty([transporter_0, transporter_1, transporter_2])
+- WRONG: is_empty(transporter_0, transporter_1, transporter_2)  ❌ Too many arguments!
+- CRITICAL: The result of is_empty() is NOT the final answer! It only identifies which transporter(s) are empty. You must continue to find which pallet/object they should pick up using closest() or other functions.
+
+COMMON INTERPRETATION & EDGE CASES:
+1. "Left/Right [Zone/Buffer/Area]":
+   - MEANING: The specific zone object that is at the leftmost/rightmost position.
+   - ACTION: You MUST call most_left([buffers]) or most_right([buffers]) FIRST.
+   - DO NOT assume it means "the empty space next to the buffer".
+   - DO NOT assume buffer_0 is the left one.
+
+2. "Inside" Semantics:
+   - MEANING: "Inside" includes objects placed ON TOP OF or WITHIN the boundary of another region.
+   - Even if a buffer is just a marking on the floor, pallets on it are considered "inside".
+   - ACTION: Use the inside() function confidently for pallets on buffers.
+
+3. "Empty/Idle Transporter":
+   - ACTION: Always call is_empty([transporters]) first.
+
+CRITICAL ERROR PREVENTION:
+- ERROR: "Since buffer_0 is typically the first one, I will check buffer_0."
+  CORRECTION: IDs are random. You MUST call most_left/most_right/middle/closest to find the correct target.
+- ERROR: "I need to find the left buffer. <execute>inside(buffer_0...)</execute>"
+  CORRECTION: If you need to find it, your FIRST call must be the finding function (most_left), NOT the counting function.
+  
+<question>  
+Solve this question and answer with the following format:  
+<reasoning>  
+Keep your reasoning BRIEF (2-5 sentences). Identify the key function(s) needed and call them immediately.
+DO NOT overthink or write long explanations. Take action first, think later if needed.
+CRITICAL: If you mention needing to find "leftmost", "rightmost", "closest", etc. in your reasoning, you MUST call that function in <execute> NOW. Do NOT skip it and assume based on IDs!
+</reasoning>  
+then, choose one action between <execute> and <answer>  
+<execute>  
+Use one function here, I will return the results for you. After you receive the output from me, continue to the next iteration. Always start with the provided function name!
+IMPORTANT: Always write a complete function call inside the execute tags with EXACTLY the correct number of arguments as specified above.
+- Functions that require a list must receive ONE list argument: [mask1, mask2, ...]
+- Do NOT pass multiple individual arguments when a list is required
+For example:
+<execute>most_right([buffer_0, buffer_1])</execute>
+<execute>inside(buffer_1, [pallet_0, pallet_1, pallet_2])</execute>
+<execute>dist(pallet_0, buffer_1)</execute>
+</execute>  
+or
+<answer>  
+only output the answer when you got the final answer.  
+</answer>
+
+IMPORTANT: After receiving a tool result, ALWAYS reconsider the original question and the current result:
+1. Read the original question again carefully - what is it really asking for?
+2. Check if the current tool result directly answers the question or is just an intermediate step
+3. For multi-step problems (e.g., "which pallet should transporter retrieve"), intermediate results (like is_empty() returning a transporter) are NOT the final answer
+4. Only mark a result as final (<final> tag) if it truly answers the question completely
+
+Example of CORRECT multi-step reasoning:
+- Question: "Which pallet should transporter_0 retrieve?"
+- Step 1: Call is_empty([transporter_0]) → Result: transporter_0 (this is INTERMEDIATE, not final!)
+- Step 2: Call closest(transporter_0, [pallet_0, pallet_1, ...]) → Result: pallet_2 (THIS is the final answer)
+- Mark as final: <final>pallet_2</final>
+
+Example of WRONG reasoning:
+- Question: "Which pallet should transporter_0 retrieve?"
+- Step 1: Call is_empty([transporter_0]) → Result: transporter_0
+- WRONG: Marking transporter_0 as final ❌ This doesn't answer which PALLET to retrieve!
+
+After receiving a tool result, if you determine that the tool result is the final answer to the question, you can mark it by outputting <final> tag. For example:
+Tool result: True
+<final>
+This indicates that the tool result (True) should be used as the final answer. For direction questions (is_left/is_right), the boolean result will be automatically converted to "left" or "right" direction string.  
+
+CRITICAL EFFICIENCY RULES:
+- Keep reasoning SHORT (max 5 sentences). Long reasoning wastes time.
+- If you can't solve it in one call, break it into steps. Don't overthink.
+- For "which X" questions: Start by calling the relevant spatial function (most_left, most_right, closest, etc.)
+- For counting questions: Call inside() or count-related functions directly.
+- For "idle/empty transporter" questions: Your FIRST call must be is_empty([transporter_list]) to identify which ones are idle!
+- Don't make assumptions about which object to pick without checking conditions (like "idle", "closest", "leftmost") first.
+- Take ACTION first. You can iterate and adjust based on results.  
+
+Several important rules when solving the question:  
+- CRITICAL: Always provide EXACTLY the number of arguments specified for each function. Functions that take a list must receive a SINGLE list argument, not multiple individual arguments.
+- BREVITY FIRST: Keep reasoning under 5 sentences. Don't write essays.
+- ACTION OVER ANALYSIS: Call a function immediately rather than endlessly planning.
+- When asked to select or retrieve an object, please consider the distance.  
+- CRITICAL: NEVER assume which object is leftmost, rightmost, or middle based on their ID numbers or names. You MUST use the provided functions (most_left, most_right, middle) to determine spatial positions.
+- If the question asks about "leftmost", "rightmost", "middle", "furthest left", "furthest right", etc., you MUST call the corresponding function FIRST before using that object in other operations.
+- REASONING vs ACTION CONSISTENCY: If you say in <reasoning> "first find the leftmost buffer", then your <execute> MUST be most_left([...]), NOT inside(buffer_0, ...)!
+- Example: If asked "distance between rightmost pallet and shelf", you MUST:
+  1. First call: most_right([pallet_0, pallet_1, ...]) to find the rightmost pallet
+  2. Then use the result in: dist(<result_from_most_right>, shelf_X)
+- Example WRONG: Saying "first find leftmost buffer" but then calling inside(buffer_0, [...]) ❌ You skipped the most_left() call!
+- Do not make any assumptions on objects' left/middle/right relationship based on their ID number—use the provided function to determine their left/middle/right position.  
+- If you need to calculate multiple object distances, consider using the closest function.
+- IMPORTANT: Always trust the function results. The functions analyze the actual spatial positions of objects in the image, not their names or IDs.
+- When you receive a function result, use that exact result as your final answer without second-guessing or "correcting" it.
+- MULTI-STEP PROBLEMS: If you can't solve in one call, make the FIRST logical call now. Don't wait for the perfect plan.
+
+QUICK START STRATEGIES BY QUESTION TYPE:
+→ "Which pallet/object..." → Use most_left/most_right/middle or closest
+→ "How many..." → Use inside() to count objects in a region
+→ "Is X left/right of Y..." → Use is_left() or is_right() directly
+→ "Distance between..." → Use dist() after finding specific objects with most_left/most_right if needed
+→ For complex multi-step problems → Start with the FIRST step immediately (e.g., find which transporter is idle, find rightmost object, etc.)
+→ "Which pallet for idle transporter" → First call is_empty() to find idle transporters, THEN find closest pallet to them
+→ Questions mentioning "idle/empty transporter" → You MUST call is_empty([transporter_list]) first! Don't skip this step!
+→ CRITICAL: When question asks "which pallet/object for transporter X" or "optimal choice for transporter", the answer is a PALLET/OBJECT, NOT the transporter! After finding which transporter is empty with is_empty(), you MUST continue to find closest pallet using closest()!
+
+DISTANCE QUESTIONS - SPECIAL RULES:
+→ STEP-BY-STEP APPROACH REQUIRED: Distance questions often require 2-3 function calls:
+  1. First: Find the specific objects mentioned (leftmost, rightmost, closest, etc.)
+  2. Then: Call dist() with the EXACT objects found in step 1
+→ NEVER ASSUME which object is "on the right" or "on the left" based on IDs!
+  - WRONG: "shelf_1 is rightmost because it has higher ID" ❌
+  - CORRECT: Call most_right([shelf_0, shelf_1]) to find which shelf is rightmost ✓
+→ BOTH objects must be verified before calling dist():
+  - If question says "leftmost pallet" → Call most_left([all_pallets]) first
+  - If question says "shelf on the right" → Call most_right([all_shelves]) first
+  - Only AFTER finding BOTH objects, call dist(object1, object2)
+→ Example workflow for "distance between leftmost pallet and rightmost shelf":
+  1. <execute>most_left([pallet_0, pallet_1, pallet_2, ...])</execute> → Result: pallet_X
+  2. <execute>most_right([shelf_0, shelf_1])</execute> → Result: shelf_Y
+  3. <execute>dist(pallet_X, shelf_Y)</execute> → Result: final distance
+→ TRUST THE RESULT: The dist() function returns the actual distance. Use it as-is.
+→ Edge case - Distance = 0: If objects overlap or one is inside another, distance can be 0. This is valid!
