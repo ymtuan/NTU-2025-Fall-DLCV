@@ -1,0 +1,7 @@
+For p1, in dust3r/dust3r/model.py
+
+original dust3r repo:
+ckpt = torch.load(model_path, map_location='cpu')
+
+# Fix for PyTorch 2.6+ to load checkpoints with serialized args
+ckpt = torch.load(model_path, map_location='cpu', weights_only=False)
